@@ -58,7 +58,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 
 - [x] T1.1 ADR de base
 - [x] T1.2 Raíz del monorepo
-- [ ] T1.3 Andamiaje de `apps/web`
+- [x] T1.3 Andamiaje de `apps/web`
 - [ ] T1.4 Variables de entorno validadas
 - [ ] T1.5 Andamiaje de `services/solver`
 - [ ] T1.6 Dockerfiles y Docker Compose
@@ -123,15 +123,23 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
   - `src/app/{layout.tsx, page.tsx, globals.css}`.
   - Carpetas `src/{domain,application,infrastructure,ui,lib}` con `README.md` que explica la capa.
   - `src/lib/container.ts` (composition root vacío).
-  - `eslint-rules.test.ts` y fixtures de reglas en `apps/web/test/lint-fixtures/`.
+  - `apps/web/test/eslint-rules.test.ts` y fixtures de reglas en `apps/web/test/lint-fixtures/`.
+  - `apps/web/test/scaffold.test.ts` (configuración), `apps/web/test/environment.test.ts` (proyecto `unit`)
+    y `apps/web/test/integration/environment.int.test.ts` (proyecto `integration`).
 - **Criterios de aceptación:**
   - `tsconfig` con `strict`, `noUncheckedIndexedAccess` y `noImplicitOverride`.
   - ESLint:
     - Hace cumplir las dependencias entre capas [02 §1.2] mediante `no-restricted-imports`.
     - Prohíbe `dangerouslySetInnerHTML`, `$queryRawUnsafe` y `any` explícito.
+    - Las reglas no se pueden esquivar: las capas se aplican también a re-exportaciones e imports
+      dinámicos (`import("…")`); se prohíbe `import()` con ruta no literal; `dangerouslySetInnerHTML` se
+      detecta también en `createElement` y en *spreads*; `$queryRawUnsafe`/`$executeRawUnsafe`, también con
+      corchetes; y en `src/` no se pueden desactivar reglas con comentarios (`noInlineConfig`).
+    - Los tests de reglas tienen un *timeout* propio (el primer análisis en frío supera los 5 s de Vitest).
   - Un test ejecuta ESLint sobre los fixtures y comprueba que **fallan** los casos que deben fallar:
     `domain` importando `@prisma/client` y `ui` importando `infrastructure`.
   - Vitest con dos proyectos, `unit` (jsdom) e `integration` (node).
+  - `next.config.ts` con `poweredByHeader: false` (no revela la tecnología) y `output: 'standalone'` (T1.6).
   - `package.json` define los scripts que usa `scripts/check.sh`: `dev`, `lint`, `typecheck`, `test`
     (proyecto `unit`) y `test:e2e`. `dev` escucha solo en `127.0.0.1` (`next dev -H 127.0.0.1`), para no
     exponer el servidor de desarrollo en la red local; un test lo comprueba.

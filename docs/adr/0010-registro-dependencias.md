@@ -46,6 +46,7 @@ Criterios de admisión de una dependencia:
 |-------------|--------|----------|-----|------------------------|
 | Next.js | web | MIT | Framework (App Router), BFF, Server Actions | Impuesto por `CLAUDE.md` §1.2 |
 | React | web | MIT | UI (dependencia de Next.js) | — |
+| React DOM | web | MIT | Renderizado de React en el navegador (dependencia de Next.js) | — |
 | TypeScript | web (dev) | Apache-2.0 | Tipado estricto | Impuesto por `CLAUDE.md` §1.2 |
 | Tailwind CSS | web | MIT | Estilos con tokens de diseño | Impuesto por `CLAUDE.md` §1.2 |
 | shadcn/ui | web | MIT | Componentes accesibles copiados al repo (Radix UI) | Impuesto por `CLAUDE.md` §1.2 |
@@ -60,6 +61,9 @@ Criterios de admisión de una dependencia:
 | Dependencia | Ámbito | Licencia | Uso | Alternativa descartada |
 |-------------|--------|----------|-----|------------------------|
 | ESLint | web (dev) | MIT | Lint y reglas de capas | — |
+| eslint-config-next | web (dev) | MIT | Reglas de Next.js, React, hooks, accesibilidad (jsx-a11y) y TypeScript (incluye typescript-eslint, que aporta `no-explicit-any`) | Configurar cada plugin a mano: más mantenimiento y riesgo de omitir reglas de accesibilidad |
+| @tailwindcss/postcss | web (dev) | MIT | Plugin PostCSS de Tailwind CSS v4 (parte de Tailwind) | — |
+| @types/node, @types/react, @types/react-dom | web (dev) | MIT | Tipos para TypeScript estricto | — |
 | Vitest | web (dev) | MIT | Tests unitarios y de integración | Jest: configuración ESM/TS más costosa |
 | Testing Library | web (dev) | MIT | Tests de componentes (`@testing-library/react`, `user-event`, `jest-dom`) | Enzyme: abandonado |
 | jsdom | web (dev) | MIT | Entorno DOM para Vitest | happy-dom: menos fiel |
@@ -107,3 +111,12 @@ Criterios de admisión de una dependencia:
   `package.json` y `pyproject.toml` contra este documento en cada revisión de hito.
 - **Seguimiento:** el script de verificación de ADR (`scripts/check-adrs.sh`) comprueba que las
   dependencias de H1 están registradas.
+
+## Historial
+
+- **2026-11-22 (T1.3):** se añaden React DOM, eslint-config-next, @tailwindcss/postcss y los paquetes `@types/*`, que el andamiaje de `apps/web` necesita y no estaban registrados.
+- **2026-11-22 (T1.3):** versiones mayores fijadas por compatibilidad. Se usa **ESLint 9**, porque los
+  plugins de `eslint-config-next` (`import`, `jsx-a11y`, `react`) aún no admiten ESLint 10. Se usa
+  **TypeScript 6.0**, porque typescript-eslint exige `< 6.1` y TypeScript 7 (compilador nativo) no está
+  soportado. `@types/node` se alinea con el runtime (Node 22). Se revisará al subir de versión mayor,
+  cuando el ecosistema lo admita (`pnpm peers check` sin avisos).

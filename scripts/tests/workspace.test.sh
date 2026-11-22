@@ -113,9 +113,10 @@ make_root() {
 }
 
 # run_check <tarea> [VAR=valor ...]: ejecuta check.sh y deja la salida en $OUT y el código en $CODE.
+# Aísla CHECK_REQUIRE_ALL del entorno exterior (CI lo fija a 1): solo lo reciben los casos que lo pasan.
 run_check() {
   local task="$1"; shift
-  OUT="$(env PATH="$WORK/bin:$PATH" STUB_LOG="$WORK/log" CHECK_ROOT="$WORK/root" "$@" "$CHECK" "$task" 2>&1)"
+  OUT="$(env -u CHECK_REQUIRE_ALL PATH="$WORK/bin:$PATH" STUB_LOG="$WORK/log" CHECK_ROOT="$WORK/root" "$@" "$CHECK" "$task" 2>&1)"
   CODE=$?
 }
 
@@ -184,7 +185,7 @@ expect "dev: si un proceso termina con error, el código es != 0" '[ "$CODE" -ne
 # bash ignora SIGINT en procesos en segundo plano de shells no interactivas).
 make_root yes yes pass
 : > "$WORK/pids"
-env PATH="$WORK/bin:$PATH" STUB_LOG="$WORK/log" STUB_PIDS="$WORK/pids" STUB_SLEEP="run dev|uvicorn" \
+env -u CHECK_REQUIRE_ALL PATH="$WORK/bin:$PATH" STUB_LOG="$WORK/log" STUB_PIDS="$WORK/pids" STUB_SLEEP="run dev|uvicorn" \
   CHECK_ROOT="$WORK/root" "$CHECK" dev > "$WORK/dev.out" 2>&1 &
 dev_pid=$!
 for _ in 1 2 3 4 5 6 7 8 9 10; do [ "$(wc -l < "$WORK/pids")" -ge 2 ] && break; sleep 0.3; done

@@ -1,0 +1,51 @@
+[project]
+name = "solver"
+version = "0.1.0"
+description = "Motor de optimización de horarios escolares (FastAPI + OR-Tools CP-SAT)."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.120",
+    "pydantic>=2.12",
+    "pydantic-settings>=2.11",
+    "uvicorn>=0.38",
+]
+
+[dependency-groups]
+dev = [
+    "httpx2>=2.16",
+    "mypy>=1.18",
+    "pytest>=8.4",
+    "pytest-cov>=7.0",
+    "ruff>=0.14",
+]
+
+[build-system]
+requires = ["uv_build>=0.13,<0.14"]
+build-backend = "uv_build"
+
+[tool.uv]
+# Política de dependencias (ADR-0010): solo versiones publicadas hace al menos 2 semanas. Se actualiza
+# esta fecha de forma deliberada al subir dependencias (y se revisa `uv lock --upgrade`).
+exclude-newer = "2026-11-08T00:00:00Z"
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "ANN"]
+
+[tool.ruff.lint.per-file-ignores]
+# assert es la forma idiomática de comprobar en pytest.
+"tests/**" = ["S101"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config"]
+filterwarnings = ["error"]

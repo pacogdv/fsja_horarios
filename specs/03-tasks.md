@@ -60,7 +60,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - [x] T1.2 Raíz del monorepo
 - [x] T1.3 Andamiaje de `apps/web`
 - [x] T1.4 Variables de entorno validadas
-- [ ] T1.5 Andamiaje de `services/solver`
+- [x] T1.5 Andamiaje de `services/solver`
 - [ ] T1.6 Dockerfiles y Docker Compose
 - [ ] T1.7 Prisma: identidad y curso
 - [ ] T1.8 Política de acceso (RBAC)
@@ -178,20 +178,29 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 
 #### T1.5 — Andamiaje de `services/solver`
 - **Archivos:**
-  - `services/solver/pyproject.toml`, `uv.lock`.
-  - `src/solver/__init__.py`, `src/solver/api/{app.py, routes.py, auth.py}`, `src/solver/settings.py`.
-  - `tests/integration/test_health_and_auth.py`.
+  - `services/solver/pyproject.toml`, `uv.lock`, `.python-version`.
+  - `src/solver/__init__.py`, `src/solver/api/{app.py, routes.py, auth.py, body_limit.py}`, `src/solver/settings.py`.
+  - `tests/integration/test_health_and_auth.py`, `tests/unit/api/test_body_limit.py`, `tests/unit/test_settings.py`,
+    `tests/unit/test_project_config.py`.
 - **Criterios de aceptación:**
   - Python ≥ 3.12, `mypy --strict` y `ruff` (reglas `E,F,I,B,UP,S,ANN`) sin errores.
   - `GET /health` devuelve `200 {status, version}` sin token.
   - Cualquier otra ruta sin token, o con token incorrecto, devuelve `401`. La comparación usa
-    `hmac.compare_digest`.
-  - Un cuerpo de más de 5 MB devuelve `413`.
-  - `settings.py` valida las variables con Pydantic Settings.
+    `hmac.compare_digest`. Las rutas inexistentes también devuelven `401` sin token, para no revelar qué
+    rutas existen. La respuesta lleva `WWW-Authenticate: Bearer` y nunca repite el token recibido.
+    Las conexiones WebSocket se rechazan siempre (el solver no tiene rutas WebSocket): solo el ciclo de
+    vida (`lifespan`) queda fuera de la autenticación.
+  - Un cuerpo de más de 5 MB devuelve `413`, también sin `Content-Length` (transferencia por partes). La
+    autenticación se comprueba antes: el cuerpo de un cliente no autenticado no se lee.
+  - `/docs`, `/redoc` y `/openapi.json` están desactivados (el contrato está en la spec 02 §3).
+  - `settings.py` valida las variables con Pydantic Settings: `SOLVER_SERVICE_TOKEN` (secreto, ≥ 32
+    caracteres) y `SOLVER_MAX_CONCURRENT_JOBS` (entero ≥ 1, por defecto 1). Los errores nombran la variable
+    y nunca muestran su valor, y el token no aparece en `repr` ni en `str` de la configuración.
+  - `[tool.uv] exclude-newer` aplica la política del ADR-0010 (versiones con ≥ 2 semanas de antigüedad).
   - `app.py` expone la fábrica `create_app()`, que usa `scripts/check.sh dev`
     (`uvicorn solver.api.app:create_app --factory`).
 - **Refs:** [02 §1.3, §3.2, §5.7]
-- **Test:** `uv run --directory services/solver pytest tests/integration/test_health_and_auth.py`
+- **Test:** `uv run --directory services/solver pytest && uv run --directory services/solver ruff check . && uv run --directory services/solver ruff format --check . && uv run --directory services/solver mypy --strict src tests`
 
 #### T1.6 — Dockerfiles y Docker Compose
 - **Archivos:** `apps/web/Dockerfile`, `services/solver/Dockerfile`, `docker-compose.yml`,

@@ -83,7 +83,7 @@ Criterios de admisión de una dependencia:
 
 | Dependencia | Ámbito | Licencia | Uso | Alternativa descartada |
 |-------------|--------|----------|-----|------------------------|
-| HTTPX | solver (dev) | BSD-3-Clause | Cliente de `TestClient` de FastAPI | — |
+| httpx2 | solver (dev) | BSD-3-Clause | Cliente HTTP del `TestClient` de FastAPI/Starlette | HTTPX: Starlette ≥ 1.10 lo declara obsoleto para `TestClient` |
 | pytest | solver (dev) | MIT | Tests | unittest: más verboso |
 | pytest-cov | solver (dev) | MIT | Cobertura ≥ 90 % (`CLAUDE.md` §4.1) | — |
 | ruff | solver (dev) | MIT | Lint y formato | flake8 + black + isort: tres herramientas |
@@ -120,3 +120,4 @@ Criterios de admisión de una dependencia:
   **TypeScript 6.0**, porque typescript-eslint exige `< 6.1` y TypeScript 7 (compilador nativo) no está
   soportado. `@types/node` se alinea con el runtime (Node 22). Se revisará al subir de versión mayor,
   cuando el ecosistema lo admita (`pnpm peers check` sin avisos).
+- **2026-11-22 (T1.5):** se sustituye HTTPX por **httpx2** (sucesor mantenido por la organización de Pydantic, mismo autor y licencia), porque Starlette 1.10 declara obsoleto `httpx` en `TestClient`.

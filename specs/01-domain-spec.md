@@ -1,6 +1,6 @@
 # 01 — Especificación funcional del dominio
 
-> **Estado:** Borrador · **Versión:** 0.1 · **Última actualización:** 2026-11-22
+> **Estado:** Borrador · **Versión:** 0.2 · **Última actualización:** 2026-11-22
 
 Este documento define **qué** debe hacer el sistema de generación y gestión de horarios escolares.
 Es la fuente de verdad funcional: cualquier cambio de requisitos se refleja aquí antes de tocar código
@@ -280,8 +280,8 @@ sesiones del tutor:
 - Un **subgrupo** pertenece a una **partición** y tiene uno o varios **grupos de referencia**
   (p. ej. Diversificación formada con alumnos de 3.º A y 3.º B).
 - Los subgrupos de una misma partición son **disjuntos**: pueden tener sesiones simultáneas.
-- Los subgrupos de particiones distintas del mismo grupo **comparten alumnado**: NO pueden tener
-  sesiones simultáneas.
+- Dos subgrupos de particiones distintas que **comparten algún grupo de referencia** comparten
+  alumnado: NO pueden tener sesiones simultáneas. Si no comparten ningún grupo de referencia, sí pueden.
 - Una sesión del grupo de referencia ocupa a todos sus subgrupos (sesión común).
 - Una sesión de un subgrupo ocupa ese subgrupo y bloquea las sesiones comunes del grupo de referencia
   en esa celda.
@@ -345,7 +345,8 @@ consecutivos) y `ventana horaria` (celdas permitidas).
   consultable (`EN_COLA`, `VALIDANDO`, `CALCULANDO`, `COMPLETADO`, `SIN_SOLUCION`, `CANCELADO`, `ERROR`),
   y se puede cancelar.
 - Parámetros de ejecución: tiempo límite (segundos), número de resultados N (MR-01), pesos de las
-  restricciones ponderables (RB) y semilla (para reproducibilidad).
+  restricciones ponderables (RB), semilla y modo determinista. La reproducibilidad exacta (misma
+  entrada + misma semilla ⇒ mismo resultado) solo se garantiza en modo determinista, que es más lento.
 - La ejecución usa una **instantánea** de los datos: los cambios posteriores no la alteran.
 - Se aplica rate limiting a esta operación (ver `CLAUDE.md`, sección 3).
 
@@ -391,7 +392,7 @@ Una solución que incumpla cualquiera de ellas **no es válida**.
 | **RD-07** | **Posiciones prefijadas** y sesiones bloqueadas (EDI-04) se respetan. |
 | **RD-08** | **Simultaneidad**: los componentes de un bloque coinciden en las mismas celdas; los conjuntos de optativas incompatibles no coinciden (ENT-04). |
 | **RD-09** | **Guardias**: el cupo de cada docente es exacto y se respetan el máximo y el mínimo de docentes simultáneos por tramo (NL-01). |
-| **RD-10** | **Reuniones**: todos los participantes coinciden, se respetan la frecuencia, la duración y la ventana (NL-02). |
+| **RD-10** | **Reuniones**: todos los participantes coinciden, se respetan la frecuencia, la duración y la ventana, con como máximo una ocurrencia de cada reunión por día (NL-02). |
 | **RD-11** | **Aula válida**: el aula asignada pertenece al criterio de aula de la actividad (ENT-02). |
 | **RD-12** | **Cargas máximas**: no se superan las horas lectivas semanales, las horas complementarias ni los tramos lectivos diarios máximos del profesor (si están definidos). |
 | **RD-13** | **Distribución obligatoria**: si una actividad marca su modo de distribución (RB-04) como obligatorio, se aplica como restricción dura. |
@@ -401,16 +402,16 @@ Una solución que incumpla cualquiera de ellas **no es válida**.
 - Cada una tiene un **peso entero de 0 a 100**, configurable por `ADMIN_DIRECCION`. Con peso `0`, la
   restricción queda desactivada.
 - Función objetivo (a minimizar): `Σ peso_i × penalización_i`, donde cada penalización se mide en
-  unidades naturales (cuartos de tramo, sesiones, días…). Su definición exacta forma parte del contrato
+  unidades naturales (minutos, cuartos de tramo, sesiones, días…). Su definición exacta forma parte del contrato
   con el solver.
 - Los pesos por defecto se proponen en la tabla y son editables.
 
 | ID | Objetivo | Penalización | Peso por defecto |
 |----|----------|--------------|------------------|
-| **RB-01** | Minimizar **huecos** en los horarios de los profesores | Nº de cuartos de tramo lectivo libres entre la primera y la última ocupación de cada profesor y día (sin contar recreos ni paradas). | 80 |
+| **RB-01** | Minimizar **huecos** en los horarios de los profesores | Minutos reales lectivos libres entre la primera y la última ocupación de cada profesor y día (sin contar recreos ni paradas). Se mide en minutos porque un profesor puede trabajar en marcos con unidades de tramo distintas. | 80 |
 | **RB-02** | Agrupar las **horas libres de los grupos** en los extremos de la jornada | Nº de cuartos de tramo libres de cada grupo situados entre dos sesiones del mismo día. | 70 |
 | **RB-03** | Respetar las **preferencias de plantilla** | +1 por cada cuarto de tramo ocupado en una celda `NO_PREFERENTE` de una entidad implicada; +1 por cada celda `PREFERENTE` de profesor que queda sin usar. | 50 |
-| **RB-04** | **Distribución** de las sesiones de una materia, según el modo de la actividad: `DIAS_DISTINTOS` (no repetir día), `DIAS_NO_CONSECUTIVOS` (además, evitar días seguidos) o `DIAS_CONSECUTIVOS` (concentrar en días seguidos) | Nº de pares de sesiones que incumplen el modo. | 60 |
+| **RB-04** | **Distribución** de las sesiones de una materia, según el modo de la actividad: `DIAS_DISTINTOS` (no repetir día), `DIAS_NO_CONSECUTIVOS` (además, evitar días seguidos) o `DIAS_CONSECUTIVOS` (concentrar en días seguidos) | `DIAS_DISTINTOS`: sesiones en exceso por día (sesiones del día − 1). `DIAS_NO_CONSECUTIVOS`: lo anterior + nº de pares de días consecutivos con sesión. `DIAS_CONSECUTIVOS`: nº de rachas de días con sesión − 1. | 60 |
 | **RB-05** | Minimizar los **días de asistencia** del docente | Nº de días con alguna ocupación, por docente. | 20 |
 | **RB-06** | Usar el **aula preferente** (ENT-02) | Nº de sesiones colocadas en un aula alternativa, ponderado por la posición en la lista. | 30 |
 
@@ -438,11 +439,11 @@ el tiempo límite, se entregan los obtenidos y se informa.
 
 | Métrica | Definición |
 |---------|------------|
-| Total de huecos de profesores | Suma de la penalización de RB-01, expresada en tramos. |
+| Total de huecos de profesores | Suma de la penalización de RB-01, expresada en horas y minutos. |
 | Huecos de grupos | Suma de la penalización de RB-02, expresada en tramos. |
 | % de preferencias cumplidas | `celdas marcadas cumplidas / total de celdas marcadas` (una celda `PREFERENTE` se cumple si se ocupa; una `NO_PREFERENTE`, si no se ocupa). |
 | Distribución cumplida | % de actividades sin incumplimientos de RB-04. |
-| Puntuación global | Valor de la función objetivo (menor es mejor) y su normalización de 0 a 100 (100 = sin penalizaciones). |
+| Puntuación global | Valor de la función objetivo (menor es mejor) y su normalización `100 · (1 − Σ Wᵢ·Penᵢ/Mᵢ / Σ Wᵢ)`, donde `Mᵢ` es una cota superior analítica de cada penalización (ver `02-architecture-plan.md`, 4.6). Vale 100 sin penalizaciones o si todos los pesos son 0. |
 | Estado y tiempo | `OPTIMO` / `FACTIBLE` y segundos de cálculo. |
 
 **MR-04** — La interfaz DEBE mostrar los resultados lado a lado (tabla comparativa) y permitir abrir

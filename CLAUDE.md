@@ -45,8 +45,8 @@ contradice este documento, se debe señalar la contradicción antes de actuar.
 ### 1.4 Base de datos y contrato web ↔ solver
 - **PostgreSQL** gestionado exclusivamente desde `/apps/web` (Prisma + migraciones versionadas).
 - **Contrato JSON estricto** entre web y solver:
-  - Definido en la spec de contrato de `/specs` (`NN-solver-contract-spec.md`), con esquema versionado
-    (campo `schemaVersion`).
+  - Definido en `specs/02-architecture-plan.md`, sección 3, con esquema versionado (campo
+    `schemaVersion`). Los JSON Schema generados desde Pydantic se versionan en `services/solver/schemas/`.
   - Modelado en Pydantic (solver) y en Zod (web); ambos deben coincidir con la spec.
   - El JSON Schema generado desde Pydantic se usa en tests de contrato en ambos lados.
   - Cualquier cambio del contrato es un **cambio de spec**: se actualiza primero esa spec,
@@ -139,7 +139,7 @@ En el solver: `solver/domain` (modelo del problema), `solver/constraints` (una r
 - `pytest` (+ `pytest-cov`).
 - Cobertura **≥ 90 %** en: restricciones duras, restricciones ponderables y detección de conflictos.
 - Cada restricción tiene tests de caso factible, caso infactible y caso límite.
-- Tests de contrato contra el JSON Schema definido en la spec de contrato web ↔ solver.
+- Tests de contrato contra los JSON Schema de `services/solver/schemas/`.
 
 ### 4.2 `/apps/web`
 - **Vitest** + **React Testing Library**: dominio, casos de uso, validadores Zod, control de acceso y

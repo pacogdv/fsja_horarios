@@ -56,7 +56,7 @@ el resto de H1 y con H3.
 **Objetivo:** el monorepo arranca con `docker compose up`, un usuario inicia sesión de forma segura y el
 acceso queda controlado por rol en el servidor. CI ejecuta todo.
 
-- [ ] T1.1 ADR de base
+- [x] T1.1 ADR de base
 - [ ] T1.2 Raíz del monorepo
 - [ ] T1.3 Andamiaje de `apps/web`
 - [ ] T1.4 Variables de entorno validadas
@@ -78,17 +78,18 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 #### T1.1 — ADR de base
 - **Archivos:** `docs/adr/README.md` (índice), `docs/adr/0000-plantilla.md`, `docs/adr/0001-prisma-web-duena-esquema.md`,
   `0002-sesiones-opacas-en-bd.md`, `0008-rate-limiting-postgresql.md`, `0009-csp-style-unsafe-inline.md`,
-  `0010-registro-dependencias.md`.
+  `0010-registro-dependencias.md`, `scripts/check-adrs.sh` (verificador de estos criterios, reutilizable en CI).
 - **Criterios de aceptación:**
   - Cada ADR tiene las secciones Estado, Contexto, Decisión, Alternativas consideradas y Consecuencias.
+  - El estado de cada ADR redactado es `Propuesto`, `Aceptado`, `Rechazado`, `Sustituido` u `Obsoleto`.
   - ADR-0010 registra las dependencias de H1: pnpm, uv, Next.js, Tailwind, shadcn/ui, TanStack Query, Zod,
     Prisma, `@node-rs/argon2`, Vitest, Testing Library, Playwright, FastAPI, Pydantic, OR-Tools, pytest,
     pytest-cov, ruff, mypy. Los hitos posteriores **lo amplían**.
   - El índice enlaza todos los ADR y marca como “Pendiente” los de la sección 7 de la spec 02 que aún no
     estén redactados.
 - **Refs:** [02 §7]
-- **Test:** `test -f docs/adr/0001-prisma-web-duena-esquema.md && grep -c "## Decisión" docs/adr/00*.md`
-  (cada ADR redactado debe dar 1).
+- **Test:** `./scripts/check-adrs.sh` (comprueba todos los criterios anteriores; termina con código ≠ 0
+  si falla alguno).
 
 #### T1.2 — Raíz del monorepo
 - **Archivos:** `package.json`, `pnpm-workspace.yaml`, `.node-version` (22 LTS), `.editorconfig`,
@@ -207,6 +208,8 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
   - Caducidad absoluta de 8 h y por inactividad de 30 min. La renovación deslizante se hace como máximo
     cada 5 min.
   - `revokeAllForUser` invalida todas las sesiones del usuario.
+  - `purgeExpired` borra las sesiones caducadas (absoluta o por inactividad). Se invoca de forma
+    oportunista en cada login correcto (ADR-0002).
   - Cookie `__Host-fsja_session` con `HttpOnly`, `Secure`, `SameSite=Lax` y `Path=/`, sin `Domain`.
 - **Refs:** [02 §5.2]
 - **Test:** `pnpm --filter web exec vitest run --project integration src/infrastructure/auth/pg-session-store.int.test.ts`
@@ -297,7 +300,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 #### T1.18 — Integración continua
 - **Archivos:** `.github/workflows/ci.yml`.
 - **Criterios de aceptación:**
-  - Trabajos: `check`, `web-unit`, `web-integration` (servicio postgres:16), `solver-tests` (con
+  - Trabajos: `check` (incluye `./scripts/check-adrs.sh`), `web-unit`, `web-integration` (servicio postgres:16), `solver-tests` (con
     cobertura), `docker-build`, `e2e` (compose completo y artefacto del informe de Playwright).
   - Usa caché de pnpm y uv.
   - Un fallo en cualquier trabajo bloquea el merge.
@@ -340,7 +343,7 @@ diagnostica la infactibilidad y verifica sus soluciones con un comprobador indep
 - **Criterios de aceptación:** misma estructura que T1.1. ADR-0005 incluye el argumento de corrección de
   los puntos de control (propiedad de Helly).
 - **Refs:** [02 §4.2, §4.3, §4.7, §7]
-- **Test:** `grep -c "## Decisión" docs/adr/000{3,5,6}-*.md`
+- **Test:** `./scripts/check-adrs.sh` (con los nuevos ADR ya no marcados como “Pendiente” en el índice)
 
 #### T2.2 — Contrato Pydantic v1 y JSON Schema
 - **Archivos:** `src/solver/contract/{input.py, output.py, validators.py, export_schema.py}`,
@@ -864,7 +867,7 @@ consulta y edita el horario con validación en vivo.
   Se amplía `0010` con `@dnd-kit/core` y `ajv` (dev).
 - **Criterios de aceptación:** misma estructura que T1.1.
 - **Refs:** [02 §7]
-- **Test:** `grep -c "## Decisión" docs/adr/000{4,7}-*.md`
+- **Test:** `./scripts/check-adrs.sh` (con los nuevos ADR ya no marcados como “Pendiente” en el índice)
 
 #### T4.2 — Contrato Zod y paridad con JSON Schema
 - **Archivos:** `src/infrastructure/solver/{contract.ts, contract.test.ts}`.
@@ -1064,7 +1067,7 @@ demostración completo se carga con un comando y la suite E2E cubre los flujos d
 - **Criterios de aceptación:** misma estructura que T1.1. El ADR incluye el impacto en el tamaño de la
   imagen y en la seguridad.
 - **Refs:** [IO-03], [02 §7]
-- **Test:** `grep -c "## Decisión" docs/adr/0011-*.md`
+- **Test:** `./scripts/check-adrs.sh` (con los nuevos ADR ya no marcados como “Pendiente” en el índice)
 
 #### T5.2 — Exportación JSON estructurada
 - **Archivos:** `src/application/io/export-json.ts`, `src/infrastructure/export/json.ts`,

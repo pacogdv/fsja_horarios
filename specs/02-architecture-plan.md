@@ -901,7 +901,8 @@ cerrado con el nonce. Las fuentes se sirven desde la propia app (`next/font/loca
     que `Origin` coincida con `APP_ORIGIN`.
   - Ningún `GET` tiene efectos secundarios.
 - **Rate limiting** (`pg-rate-limiter.ts`, ventana fija en la tabla `rate_limit_bucket`, operación
-  atómica con `INSERT … ON CONFLICT DO UPDATE`):
+  atómica con `INSERT … ON CONFLICT DO UPDATE`). Las claves no contienen datos personales en claro:
+  el correo se incluye como `sha256(email normalizado)` (ADR-0008):
 
 | Operación | Límite |
 |-----------|--------|

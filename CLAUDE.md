@@ -45,10 +45,11 @@ contradice este documento, se debe señalar la contradicción antes de actuar.
 ### 1.4 Base de datos y contrato web ↔ solver
 - **PostgreSQL** gestionado exclusivamente desde `/apps/web` (Prisma + migraciones versionadas).
 - **Contrato JSON estricto** entre web y solver:
-  - Definido en `/specs/contracts/` (esquema versionado, con campo `schemaVersion`).
+  - Definido en la spec de contrato de `/specs` (`NN-solver-contract-spec.md`), con esquema versionado
+    (campo `schemaVersion`).
   - Modelado en Pydantic (solver) y en Zod (web); ambos deben coincidir con la spec.
   - El JSON Schema generado desde Pydantic se usa en tests de contrato en ambos lados.
-  - Cualquier cambio del contrato es un **cambio de spec**: se actualiza primero `/specs/contracts/`,
+  - Cualquier cambio del contrato es un **cambio de spec**: se actualiza primero esa spec,
     se incrementa la versión y se adaptan ambos lados en la misma tarea.
 
 ### 1.5 Infraestructura local
@@ -138,7 +139,7 @@ En el solver: `solver/domain` (modelo del problema), `solver/constraints` (una r
 - `pytest` (+ `pytest-cov`).
 - Cobertura **≥ 90 %** en: restricciones duras, restricciones ponderables y detección de conflictos.
 - Cada restricción tiene tests de caso factible, caso infactible y caso límite.
-- Tests de contrato contra el JSON Schema de `/specs/contracts/`.
+- Tests de contrato contra el JSON Schema definido en la spec de contrato web ↔ solver.
 
 ### 4.2 `/apps/web`
 - **Vitest** + **React Testing Library**: dominio, casos de uso, validadores Zod, control de acceso y
@@ -168,17 +169,20 @@ En el solver: `solver/domain` (modelo del problema), `solver/constraints` (una r
 7. No hacer commits ni push salvo petición expresa.
 
 ### Organización de `/specs`
-- `specs/README.md` — índice y convenciones.
-- `specs/domain/` — glosario y modelo del dominio escolar.
-- `specs/features/` — una spec por funcionalidad (objetivo, reglas, criterios de aceptación).
-- `specs/solver/` — restricciones duras y ponderables (ID, descripción, fórmula/criterio, peso).
-- `specs/contracts/` — contrato JSON web ↔ solver versionado.
-- `specs/security/` — roles, matriz de permisos y requisitos de seguridad.
+- Archivos planos y numerados: `specs/NN-<tema>-spec.md` (p. ej. `01-domain-spec.md`). El número
+  indica el orden de lectura y no se reutiliza.
+- `specs/01-domain-spec.md` es la especificación funcional del dominio y la referencia principal: contiene
+  el glosario, los requisitos de cada módulo, las restricciones del motor, la matriz de permisos y las
+  preguntas abiertas.
+- Las specs posteriores (p. ej. contrato web ↔ solver, seguridad, modelo de datos) detallan o amplían la
+  01 y no la contradicen. Si hace falta cambiar un requisito, se cambia en su spec de origen.
+- Convenciones de IDs, estados y criterios de aceptación: las definidas en la sección 0 de
+  `01-domain-spec.md`.
 
 ---
 
 ## 6. Idioma y convenciones
 - Documentación, specs y comunicación con el equipo: **español**.
 - Código (identificadores) en **inglés**, salvo términos del dominio sin traducción clara, que se
-  mantienen consistentes con el glosario de `specs/domain/`.
+  mantienen consistentes con el glosario de `specs/01-domain-spec.md`.
 - Commits siguiendo Conventional Commits (`feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`).

@@ -57,7 +57,7 @@ el resto de H1 y con H3.
 acceso queda controlado por rol en el servidor. CI ejecuta todo.
 
 - [x] T1.1 ADR de base
-- [ ] T1.2 Raíz del monorepo
+- [x] T1.2 Raíz del monorepo
 - [ ] T1.3 Andamiaje de `apps/web`
 - [ ] T1.4 Variables de entorno validadas
 - [ ] T1.5 Andamiaje de `services/solver`
@@ -94,14 +94,28 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 
 #### T1.2 — Raíz del monorepo
 - **Archivos:** `package.json`, `pnpm-workspace.yaml`, `.node-version` (22 LTS), `.editorconfig`,
-  `.env.example` (esqueleto), `README.md` (esqueleto), `scripts/check.sh`.
+  `.env.example` (esqueleto), `README.md` (esqueleto), `scripts/check.sh`,
+  `scripts/tests/workspace.test.sh`.
 - **Criterios de aceptación:**
-  - `pnpm install` en limpio funciona y genera `pnpm-lock.yaml`.
-  - Los scripts raíz `check`, `test`, `lint`, `typecheck`, `dev` y `test:e2e` delegan en `apps/web` y en
-    `services/solver`.
-  - `pnpm check` termina con código ≠ 0 si cualquiera de los dos lados falla.
+  - `pnpm install` en limpio funciona y genera `pnpm-lock.yaml`. `packageManager` fija una versión exacta
+    de pnpm y `engines.node` exige ≥ 22.
+  - Los scripts raíz `check`, `test`, `lint`, `typecheck`, `dev` y `test:e2e` delegan en `apps/web` (vía
+    sus scripts de `package.json`) y en `services/solver` (vía `uv run`), a través de `scripts/check.sh <tarea>`.
+    `test:e2e` solo afecta a la web.
+  - `check` = `lint` + `typecheck` de ambos lados + `scripts/tests/check-adrs.test.sh` +
+    `scripts/tests/workspace.test.sh`.
+  - Se ejecutan **todos** los pasos aunque falle alguno, y al final se muestra un resumen. El código de
+    salida es ≠ 0 si cualquiera de los dos lados falla.
+  - Mientras un componente no exista (antes de T1.3 y T1.5), sus pasos se marcan como `OMITIDO`. Con
+    `CHECK_REQUIRE_ALL=1`, un componente ausente es un fallo.
+  - `dev` arranca la web y el solver (este en `127.0.0.1:8000`) y los detiene juntos con Ctrl-C o SIGTERM,
+    terminando con código 130 sin marcar los procesos como fallidos.
+  - `engineStrict: true` en `pnpm-workspace.yaml`: pnpm se niega a instalar con Node < 22.
+  - En `.env.example`, las variables secretas (`*PASSWORD*`, `*TOKEN*`, `*SECRET*`) están vacías y ningún
+    valor contiene credenciales incrustadas en una URL (`://usuario:clave@`).
+    `.env.example` no está ignorado por git.
 - **Refs:** [02 §1.1]
-- **Test:** `pnpm install --frozen-lockfile && pnpm check`
+- **Test:** `./scripts/tests/workspace.test.sh && pnpm install --frozen-lockfile && pnpm check`
 
 #### T1.3 — Andamiaje de `apps/web`
 - **Archivos:**
@@ -118,6 +132,9 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
   - Un test ejecuta ESLint sobre los fixtures y comprueba que **fallan** los casos que deben fallar:
     `domain` importando `@prisma/client` y `ui` importando `infrastructure`.
   - Vitest con dos proyectos, `unit` (jsdom) e `integration` (node).
+  - `package.json` define los scripts que usa `scripts/check.sh`: `dev`, `lint`, `typecheck`, `test`
+    (proyecto `unit`) y `test:e2e`. `dev` escucha solo en `127.0.0.1` (`next dev -H 127.0.0.1`), para no
+    exponer el servidor de desarrollo en la red local; un test lo comprueba.
 - **Refs:** [CLAUDE.md §1.2, §2], [02 §1.2]
 - **Test:** `pnpm --filter web exec vitest run --project unit && pnpm --filter web lint && pnpm --filter web typecheck`
 
@@ -145,6 +162,8 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
     `hmac.compare_digest`.
   - Un cuerpo de más de 5 MB devuelve `413`.
   - `settings.py` valida las variables con Pydantic Settings.
+  - `app.py` expone la fábrica `create_app()`, que usa `scripts/check.sh dev`
+    (`uvicorn solver.api.app:create_app --factory`).
 - **Refs:** [02 §1.3, §3.2, §5.7]
 - **Test:** `uv run --directory services/solver pytest tests/integration/test_health_and_auth.py`
 
@@ -312,9 +331,10 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 #### T1.18 — Integración continua
 - **Archivos:** `.github/workflows/ci.yml`.
 - **Criterios de aceptación:**
-  - Trabajos: `check` (incluye `./scripts/tests/check-adrs.test.sh`), `web-unit`, `web-integration` (servicio postgres:16), `solver-tests` (con
+  - Trabajos: `check` (incluye los tests de `scripts/tests/`), `web-unit`, `web-integration` (servicio postgres:16), `solver-tests` (con
     cobertura), `docker-build`, `e2e` (compose completo y artefacto del informe de Playwright).
   - Usa caché de pnpm y uv.
+  - Ejecuta `pnpm check` con `CHECK_REQUIRE_ALL=1`, de modo que un componente ausente hace fallar CI.
   - Un fallo en cualquier trabajo bloquea el merge.
 - **Refs:** [CLAUDE.md §4]
 - **Test:** el workflow termina en verde en un PR de prueba (`gh run watch`).

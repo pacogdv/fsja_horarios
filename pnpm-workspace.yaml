@@ -1,0 +1,9 @@
+packages:
+  - "apps/*"
+
+# Política de dependencias (ADR-0010): solo se instalan versiones publicadas hace al menos 2 semanas
+# (20160 minutos). Reduce el riesgo de paquetes comprometidos recién publicados.
+minimumReleaseAge: 20160
+
+# Hace cumplir `engines.node` (>= 22) de package.json: con un Node más antiguo, pnpm se niega a instalar.
+engineStrict: true

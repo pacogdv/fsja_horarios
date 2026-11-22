@@ -1,0 +1,17 @@
+{
+  "name": "fsja-horarios",
+  "private": true,
+  "description": "Generación y gestión de horarios escolares (monorepo: apps/web + services/solver).",
+  "packageManager": "pnpm@12.18.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "./scripts/check.sh check",
+    "lint": "./scripts/check.sh lint",
+    "typecheck": "./scripts/check.sh typecheck",
+    "test": "./scripts/check.sh test",
+    "test:e2e": "./scripts/check.sh test:e2e",
+    "dev": "./scripts/check.sh dev"
+  }
+}

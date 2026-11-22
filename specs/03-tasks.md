@@ -59,7 +59,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - [x] T1.1 ADR de base
 - [x] T1.2 Raíz del monorepo
 - [x] T1.3 Andamiaje de `apps/web`
-- [ ] T1.4 Variables de entorno validadas
+- [x] T1.4 Variables de entorno validadas
 - [ ] T1.5 Andamiaje de `services/solver`
 - [ ] T1.6 Dockerfiles y Docker Compose
 - [ ] T1.7 Prisma: identidad y curso
@@ -147,14 +147,32 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - **Test:** `pnpm --filter web exec vitest run --project unit && pnpm --filter web lint && pnpm --filter web typecheck`
 
 #### T1.4 — Variables de entorno validadas
-- **Archivos:** `apps/web/src/lib/env.ts`, `apps/web/src/lib/env.test.ts`, `.env.example` (completo).
+- **Archivos:** `apps/web/src/lib/env.ts`, `apps/web/src/lib/env.test.ts`, `apps/web/src/instrumentation.ts`
+  (valida el entorno al arrancar el servidor) con su test, `.env.example` (completo).
 - **Criterios de aceptación:**
   - Esquema Zod con todas las variables web de [02 §5.7].
   - Si falta una variable o es inválida, se lanza un error que **nombra** la variable sin mostrar su valor.
   - `SOLVER_SERVICE_TOKEN` y `RATE_LIMIT_KEY_SECRET` exigen ≥ 32 caracteres.
   - `TRUSTED_PROXY_HOPS` es un entero de 0 a 3 (0 por defecto).
+  - Una variable vacía (`VAR=`) cuenta como ausente.
+  - `APP_ORIGIN` es un origen sin ruta (`http(s)://host[:puerto]`), y en `production` debe usar `https`.
+    `DATABASE_URL` es una URL `postgres://` o `postgresql://`, y `SOLVER_URL` una URL `http(s)://`.
+  - `SEED_ON_START` solo acepta `true` o `false` (por defecto `false`). No se usa una conversión booleana
+    genérica, porque convertiría `"false"` en `true`.
   - `SEED_ON_START=true` con `APP_ENV=production` hace fallar la validación.
-  - `.env.example` documenta propósito y formato de cada variable, sin valores reales.
+  - Con `SEED_ON_START=true` son obligatorias las seis variables `SEED_*`: los correos deben ser válidos y
+    las contraseñas tener ≥ 12 caracteres.
+  - El servidor valida el entorno al arrancar (`instrumentation.ts`, solo en el runtime de Node) y no arranca
+    si es inválido (02 §5.4).
+  - Los secretos (`RATE_LIMIT_KEY_SECRET`, `SOLVER_SERVICE_TOKEN`, `DATABASE_URL` y las contraseñas `SEED_*`)
+    aparecen como `[REDACTADO]` si el entorno se serializa (`JSON.stringify`) o se imprime (`console.log`),
+    aunque siguen accesibles como propiedades (CLAUDE.md §3.4: logs sin datos sensibles).
+  - `getEnv()` se niega a ejecutarse en el navegador: el entorno es solo de servidor.
+  - Toda variable de `.env.example`, incluidas las que no valida la web (`POSTGRES_*`, `SOLVER_*`), lleva un
+    comentario encima (lo comprueba `scripts/tests/workspace.test.sh`).
+  - `.env.example` documenta propósito y formato de cada variable, sin valores reales. Un test comprueba que
+    lista todas las variables del esquema, cada una con un comentario, y que al validarlo solo fallan los
+    secretos que el usuario debe rellenar.
 - **Refs:** [CLAUDE.md §3.5], [02 §5.7], [TFM-02]
 - **Test:** `pnpm --filter web exec vitest run --project unit src/lib/env.test.ts`
 

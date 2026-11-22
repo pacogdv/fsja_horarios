@@ -65,6 +65,12 @@ if [ -z "$url_with_credentials" ]; then
 else
   report fail ".env.example no contiene credenciales incrustadas en URLs" "$url_with_credentials"
 fi
+undocumented="$(awk '/^[A-Z][A-Z0-9_]*=/ { if (previous !~ /^#/) print $0 } { previous = $0 }' "$ROOT/.env.example" | cut -d= -f1)"
+if [ -z "$undocumented" ]; then
+  report ok ".env.example documenta cada variable con un comentario encima"
+else
+  report fail ".env.example documenta cada variable con un comentario encima" "$undocumented"
+fi
 if (cd "$ROOT" && git check-ignore -q .env.example); then
   report fail ".env.example no está ignorado por git" "git check-ignore lo ignora"
 else

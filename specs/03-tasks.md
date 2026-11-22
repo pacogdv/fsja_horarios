@@ -78,7 +78,8 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 #### T1.1 — ADR de base
 - **Archivos:** `docs/adr/README.md` (índice), `docs/adr/0000-plantilla.md`, `docs/adr/0001-prisma-web-duena-esquema.md`,
   `0002-sesiones-opacas-en-bd.md`, `0008-rate-limiting-postgresql.md`, `0009-csp-style-unsafe-inline.md`,
-  `0010-registro-dependencias.md`, `scripts/check-adrs.sh` (verificador de estos criterios, reutilizable en CI).
+  `0010-registro-dependencias.md`, `scripts/check-adrs.sh` (verificador de estos criterios, reutilizable en CI),
+  `scripts/tests/check-adrs.test.sh` (tests del verificador: un caso verde y un caso rojo por criterio).
 - **Criterios de aceptación:**
   - Cada ADR tiene las secciones Estado, Contexto, Decisión, Alternativas consideradas y Consecuencias.
   - El estado de cada ADR redactado es `Propuesto`, `Aceptado`, `Rechazado`, `Sustituido` u `Obsoleto`.
@@ -88,8 +89,8 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
   - El índice enlaza todos los ADR y marca como “Pendiente” los de la sección 7 de la spec 02 que aún no
     estén redactados.
 - **Refs:** [02 §7]
-- **Test:** `./scripts/check-adrs.sh` (comprueba todos los criterios anteriores; termina con código ≠ 0
-  si falla alguno).
+- **Test:** `./scripts/tests/check-adrs.test.sh` (ejecuta `check-adrs.sh` sobre los ADR reales, que debe
+  pasar, y sobre copias mutadas, en las que debe detectar cada incumplimiento).
 
 #### T1.2 — Raíz del monorepo
 - **Archivos:** `package.json`, `pnpm-workspace.yaml`, `.node-version` (22 LTS), `.editorconfig`,
@@ -125,7 +126,8 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - **Criterios de aceptación:**
   - Esquema Zod con todas las variables web de [02 §5.7].
   - Si falta una variable o es inválida, se lanza un error que **nombra** la variable sin mostrar su valor.
-  - `SOLVER_SERVICE_TOKEN` exige ≥ 32 caracteres.
+  - `SOLVER_SERVICE_TOKEN` y `RATE_LIMIT_KEY_SECRET` exigen ≥ 32 caracteres.
+  - `TRUSTED_PROXY_HOPS` es un entero de 0 a 3 (0 por defecto).
   - `SEED_ON_START=true` con `APP_ENV=production` hace fallar la validación.
   - `.env.example` documenta propósito y formato de cada variable, sin valores reales.
 - **Refs:** [CLAUDE.md §3.5], [02 §5.7], [TFM-02]
@@ -216,11 +218,19 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 
 #### T1.11 — Rate limiter en PostgreSQL
 - **Archivos:** `src/application/ports/rate-limiter.ts`,
-  `src/infrastructure/security/{pg-rate-limiter.ts, pg-rate-limiter.int.test.ts}`.
+  `src/infrastructure/security/{pg-rate-limiter.ts, pg-rate-limiter.int.test.ts, client-ip.ts, client-ip.test.ts, rate-limit-keys.ts, rate-limit-keys.test.ts}`.
 - **Criterios de aceptación:**
   - Con un límite de 5 por ventana, la 6.ª petición se rechaza e informa de `retryAfterSeconds`.
   - En la ventana siguiente se vuelve a permitir.
   - 20 incrementos concurrentes dejan el contador en exactamente 20 (atomicidad).
+  - `client-ip` sigue la spec 02 §5.6:
+    - con `TRUSTED_PROXY_HOPS = 1` y `X-Forwarded-For: 6.6.6.6, 1.2.3.4`, la IP es `1.2.3.4`;
+    - con `X-Forwarded-For` falsificado por el cliente (más entradas a la izquierda), la IP no cambia;
+    - una cabecera ausente o malformada da `unknown`;
+    - se verifica y documenta en el test cómo llega la IP en el servidor standalone de Next.js con
+      `TRUSTED_PROXY_HOPS = 0`.
+  - `rate-limit-keys` construye las claves con el correo en `HMAC-SHA256(RATE_LIMIT_KEY_SECRET, email)`.
+    El test comprueba que la clave no contiene el correo ni su SHA-256 sin clave.
 - **Refs:** [02 §5.6]
 - **Test:** `pnpm --filter web exec vitest run --project integration src/infrastructure/security/pg-rate-limiter.int.test.ts`
 
@@ -232,7 +242,9 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
   - Siguen los pasos 2 a 10 de [02 §5.2], probados con *fakes* de los puertos.
   - Con un usuario inexistente se llama igualmente a `verify` (con hash ficticio), y la respuesta es
     idéntica a la de una contraseña incorrecta.
-  - Tras 10 fallos se bloquea el usuario 15 min, con el mismo mensaje genérico.
+  - Tras 10 fallos se bloquea el usuario 15 min, con el mismo mensaje genérico. La respuesta (contenido y
+    código) de una cuenta bloqueada es idéntica a la de una contraseña incorrecta. El bloqueo se registra
+    en `audit_log`.
   - Un hash obsoleto se rehashea tras un login correcto.
   - Los logins correctos y fallidos se registran en `audit_log`, nunca con la contraseña.
 - **Refs:** [02 §5.2], [CLAUDE.md §3.1]
@@ -300,7 +312,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 #### T1.18 — Integración continua
 - **Archivos:** `.github/workflows/ci.yml`.
 - **Criterios de aceptación:**
-  - Trabajos: `check` (incluye `./scripts/check-adrs.sh`), `web-unit`, `web-integration` (servicio postgres:16), `solver-tests` (con
+  - Trabajos: `check` (incluye `./scripts/tests/check-adrs.test.sh`), `web-unit`, `web-integration` (servicio postgres:16), `solver-tests` (con
     cobertura), `docker-build`, `e2e` (compose completo y artefacto del informe de Playwright).
   - Usa caché de pnpm y uv.
   - Un fallo en cualquier trabajo bloquea el merge.
@@ -713,6 +725,8 @@ integración contra PostgreSQL.
   - CRUD de usuarios y asignación de rol.
   - Al desactivar un usuario o cambiar su rol se **revocan sus sesiones** al instante.
   - Al restablecer la contraseña se genera una temporal que se muestra una sola vez.
+  - **Desbloquear cuenta**: pone `locked_until = null` y `failed_login_count = 0`, y queda registrado en
+    `audit_log`. Es la mitigación del riesgo de bloqueo dirigido (02 §5.2, ADR-0002).
   - Solo accede `users:manage`.
 - **Refs:** [02 §5.2, §5.3]
 - **Test:** `pnpm --filter web exec vitest run --project integration src/application/admin`

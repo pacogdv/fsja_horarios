@@ -22,10 +22,16 @@ reinicios de la web y ser atómicos ante peticiones concurrentes.
    respaldado por la tabla `rate_limit_bucket(key, window_start, count)`.
 2. El incremento es atómico, con una sola sentencia `INSERT … ON CONFLICT (key, window_start) DO UPDATE
    SET count = count + 1 RETURNING count`.
-3. Las claves llevan prefijo por operación (por ejemplo `login:ip:<ip>` y `login:ip-email:<ip>:<sha256(email)>`).
-   El correo se guarda hasheado para no conservar datos personales en claro.
-4. Al superar el límite se responde `429` con `Retry-After`. Los límites concretos están en la spec 02 §5.6.
-5. Las filas de ventanas pasadas se purgan de forma oportunista.
+3. Las claves llevan prefijo por operación (por ejemplo `login:ip:<ip>` y
+   `login:ip-email:<ip>:<hmac(email)>`). El correo se seudonimiza con
+   `HMAC-SHA256(RATE_LIMIT_KEY_SECRET, email normalizado)`: un SHA-256 sin clave se podría revertir
+   probando un diccionario con los correos del centro.
+4. **IP del cliente**: se toma de `X-Forwarded-For` contando `TRUSTED_PROXY_HOPS` entradas desde la
+   derecha, nunca la entrada de más a la izquierda (la controla el cliente). Si no se puede determinar,
+   se usa la clave compartida `unknown`. Sin esto, tras el proxy inverso del H6 un atacante esquivaría
+   los límites por IP falsificando la cabecera.
+5. Al superar el límite se responde `429` con `Retry-After`. Los límites concretos están en la spec 02 §5.6.
+6. Las filas de ventanas pasadas se purgan de forma oportunista.
 
 ## Alternativas consideradas
 
@@ -46,4 +52,10 @@ reinicios de la web y ser atómicos ante peticiones concurrentes.
   - Con ventana fija se pueden concentrar hasta el doble de peticiones en el cambio de ventana. Es
     aceptable porque se combina con el bloqueo de cuenta tras 10 fallos (T1.12).
 - **Seguimiento:** si se escala horizontalmente con mucha carga, se sustituye el adaptador por uno de
-  Redis sin tocar los casos de uso.
+  Redis sin tocar los casos de uso. T1.11 verifica la extracción de IP y la seudonimización de claves.
+
+## Historial
+
+- **2026-11-22:** revisión de seguridad del H1. Se cambia el SHA-256 sin clave del correo por HMAC con
+  `RATE_LIMIT_KEY_SECRET` y se fija la extracción de la IP del cliente (`TRUSTED_PROXY_HOPS`). La
+  decisión de fondo (ventana fija en PostgreSQL) no cambia.

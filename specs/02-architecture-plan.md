@@ -801,8 +801,14 @@ Navegador ──HTTPS──▶ web (Next.js) ──red backend──▶ PostgreS
    de respuesta y no permitir enumerar usuarios.
 5. Verificación **Argon2id** (`@node-rs/argon2`, parámetros OWASP: `m = 19 MiB`, `t = 2`, `p = 1`).
    Si los parámetros del hash almacenado están obsoletos, se rehashea tras un login correcto.
-6. Bloqueo progresivo: con 10 fallos consecutivos, `locked_until = now + 15 min`. El mensaje sigue siendo
-   genérico: “Credenciales no válidas”.
+6. Bloqueo temporal: con 10 fallos consecutivos, `locked_until = now + 15 min`. El mensaje sigue siendo
+   genérico (“Credenciales no válidas”) y no revela que la cuenta está bloqueada. **Riesgo aceptado**
+   (ADR-0002): quien conozca un correo puede provocar el bloqueo de esa cuenta (denegación de servicio
+   dirigida). Se mitiga así:
+   - el bloqueo es temporal y no se acumula;
+   - los límites por IP (5.6) encarecen el ataque;
+   - `ADMIN_DIRECCION` puede desbloquear una cuenta al instante (T3.9);
+   - cada bloqueo se registra en `audit_log`.
 7. **Creación de sesión**: token aleatorio de 32 bytes (`crypto.randomBytes`). Se guarda en BD **solo su
    SHA-256** (`user_session.token_hash`). Se invalidan las sesiones previas del navegador para evitar la
    fijación de sesión.
@@ -902,7 +908,14 @@ cerrado con el nonce. Las fuentes se sirven desde la propia app (`next/font/loca
   - Ningún `GET` tiene efectos secundarios.
 - **Rate limiting** (`pg-rate-limiter.ts`, ventana fija en la tabla `rate_limit_bucket`, operación
   atómica con `INSERT … ON CONFLICT DO UPDATE`). Las claves no contienen datos personales en claro:
-  el correo se incluye como `sha256(email normalizado)` (ADR-0008):
+  el correo se incluye como `HMAC-SHA256(RATE_LIMIT_KEY_SECRET, email normalizado)`. Un hash sin clave se
+  podría revertir con un diccionario de correos del centro (ADR-0008).
+- **IP del cliente**: se obtiene **solo** de la cadena `X-Forwarded-For`, contando
+  `TRUSTED_PROXY_HOPS` saltos desde la **derecha** (las entradas que añaden los proxies de confianza). Nunca
+  se usa la entrada de más a la izquierda, porque la controla el cliente. Con `TRUSTED_PROXY_HOPS = 0` se
+  usa la dirección que añade el propio servidor Next.js. T1.11 verifica empíricamente este comportamiento
+  en el servidor standalone. Si la IP no se puede determinar, se usa la clave `unknown`, que comparte
+  límite (el comportamiento seguro por defecto).
 
 | Operación | Límite |
 |-----------|--------|
@@ -937,6 +950,8 @@ los casos de uso.
 |----------|----------|-------------|
 | `APP_ENV` | web | `development` \| `test` \| `production` |
 | `APP_ORIGIN` | web | Origen público (`http://localhost:3000`), para la comprobación de `Origin` |
+| `TRUSTED_PROXY_HOPS` | web | Nº de proxies de confianza delante de la web (0 en local; 1 tras el proxy inverso del H6) |
+| `RATE_LIMIT_KEY_SECRET` | web | Clave HMAC (≥ 32 bytes aleatorios) para seudonimizar correos en las claves de rate limiting |
 | `DATABASE_URL` | web | Cadena de conexión a PostgreSQL |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | db | Credenciales de inicialización |
 | `SOLVER_URL` | web | `http://solver:8000` |

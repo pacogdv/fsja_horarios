@@ -2,7 +2,9 @@
 
 Registro de las decisiones de arquitectura del proyecto. Cada ADR sigue la [plantilla](0000-plantilla.md)
 (Estado, Contexto, Decisión, Alternativas consideradas y Consecuencias). Un ADR aceptado no se reescribe:
-si la decisión cambia, se crea otro que lo **sustituye**.
+si la decisión cambia, se crea otro que lo **sustituye**. Las precisiones que no cambian la decisión
+(endurecimiento, riesgos descubiertos, aclaraciones) se permiten, y se anotan en una sección final
+`Historial` con fecha y motivo.
 
 Verificación automática: `./scripts/check-adrs.sh`.
 

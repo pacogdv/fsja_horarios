@@ -46,6 +46,19 @@ Además, el rol `INVITADO_DEMO` no debe conservar acceso si se retira.
 - **Negativas / riesgos aceptados:**
   - Una consulta a BD por petición autenticada. Es asumible con una sola instancia y un índice único
     sobre `token_hash`.
-  - Hay que limpiar las sesiones caducadas (tarea periódica o borrado oportunista en el login).
+  - Hay que limpiar las sesiones caducadas. Se hace con un borrado oportunista en cada login correcto
+    (T1.10).
+  - **Bloqueo dirigido de cuentas**: el bloqueo tras 10 fallos (spec 02 §5.2) permite que quien conozca un
+    correo deje esa cuenta inaccesible durante 15 min. Se acepta el riesgo, con estas mitigaciones:
+    - el bloqueo es temporal y no se acumula;
+    - la respuesta no revela que la cuenta está bloqueada;
+    - los límites por IP (ADR-0008) encarecen el ataque;
+    - `ADMIN_DIRECCION` puede desbloquear al instante (T3.9);
+    - cada bloqueo queda en `audit_log`.
 - **Seguimiento:** si se escalara horizontalmente, la tabla sigue siendo compartida y no hace falta
   ningún cambio. Si la latencia de BD fuera un problema, se añadiría una caché con TTL corto.
+
+## Historial
+
+- **2026-11-22:** revisión de seguridad del H1. Se documentan el riesgo de bloqueo dirigido y sus
+  mitigaciones, y se concreta la purga de sesiones caducadas. La decisión no cambia.

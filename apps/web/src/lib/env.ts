@@ -88,6 +88,14 @@ const envSchema = baseSchema.superRefine((env, context) => {
   if (env.APP_ENV === "production" && !env.APP_ORIGIN.startsWith("https://")) {
     context.addIssue({ code: "custom", path: ["APP_ORIGIN"], message: "debe usar https en production" });
   }
+  // Con 0 saltos, la IP sale de una X-Forwarded-For que el cliente puede falsificar (02 §5.6, verificado en T1.11).
+  if (env.APP_ENV === "production" && env.TRUSTED_PROXY_HOPS === 0) {
+    context.addIssue({
+      code: "custom",
+      path: ["TRUSTED_PROXY_HOPS"],
+      message: "debe ser 1 o más en production: la web debe estar detrás del proxy inverso (02 §5.6)",
+    });
+  }
   if (!env.SEED_ON_START) return;
   if (env.APP_ENV === "production") {
     context.addIssue({

@@ -124,6 +124,22 @@ describe("T1.4 TRUSTED_PROXY_HOPS", () => {
   it.each(["4", "-1", "1.5", "abc", " 1", "0x1", "1e0"])("rechaza %j", (value) => {
     expect(expectInvalid({ ...VALID, TRUSTED_PROXY_HOPS: value }).variables).toEqual(["TRUSTED_PROXY_HOPS"]);
   });
+
+  // T1.11: con 0, la IP sale de una X-Forwarded-For que el cliente puede falsificar (02 §5.6).
+  it.each(["0", ""])("en production rechaza %j (sin proxy de confianza)", (value) => {
+    const error = expectInvalid({ ...VALID, APP_ENV: "production", APP_ORIGIN: "https://horarios.example", TRUSTED_PROXY_HOPS: value });
+    expect(error.variables).toEqual(["TRUSTED_PROXY_HOPS"]);
+    expect(error.message).toContain("production");
+  });
+
+  it("en production acepta 1 o más (detrás del proxy inverso)", () => {
+    const production = { ...VALID, APP_ENV: "production", APP_ORIGIN: "https://horarios.example" };
+    expect(parseEnv({ ...production, TRUSTED_PROXY_HOPS: "1" }).TRUSTED_PROXY_HOPS).toBe(1);
+  });
+
+  it.each(["development", "test"])("en %s admite 0 (local)", (appEnv) => {
+    expect(parseEnv({ ...VALID, APP_ENV: appEnv, TRUSTED_PROXY_HOPS: "0" }).TRUSTED_PROXY_HOPS).toBe(0);
+  });
 });
 
 describe("T1.4 APP_ENV y URLs", () => {
@@ -139,7 +155,7 @@ describe("T1.4 APP_ENV y URLs", () => {
   );
 
   it("APP_ORIGIN debe usar https en production", () => {
-    const production = { ...VALID, APP_ENV: "production" };
+    const production = { ...VALID, APP_ENV: "production", TRUSTED_PROXY_HOPS: "1" };
     expect(expectInvalid({ ...production, APP_ORIGIN: "http://horarios.example" }).variables).toEqual([
       "APP_ORIGIN",
     ]);
@@ -180,6 +196,7 @@ describe("T1.4 seed (TFM-02)", () => {
       ...SEEDS,
       APP_ENV: "production",
       APP_ORIGIN: "https://horarios.example",
+      TRUSTED_PROXY_HOPS: "1",
       SEED_ON_START: "true",
     });
     expect(error.variables).toEqual(["SEED_ON_START"]);

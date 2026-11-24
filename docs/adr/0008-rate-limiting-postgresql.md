@@ -22,10 +22,11 @@ reinicios de la web y ser atómicos ante peticiones concurrentes.
    respaldado por la tabla `rate_limit_bucket(key, window_start, count)`.
 2. El incremento es atómico, con una sola sentencia `INSERT … ON CONFLICT (key, window_start) DO UPDATE
    SET count = count + 1 RETURNING count`.
-3. Las claves llevan prefijo por operación (por ejemplo `login:ip:<ip>` y
-   `login:ip-email:<ip>:<hmac(email)>`). El correo se seudonimiza con
-   `HMAC-SHA256(RATE_LIMIT_KEY_SECRET, email normalizado)`: un SHA-256 sin clave se podría revertir
-   probando un diccionario con los correos del centro.
+3. Las claves llevan prefijo por operación (por ejemplo `login:ip:<hmac(ip)>` y
+   `login:ip-email:<hmac(ip)>:<hmac(email)>`). El correo y la IP (dato personal según el RGPD) se
+   seudonimizan con `HMAC-SHA256(RATE_LIMIT_KEY_SECRET, "<tipo>:<valor>")`, con el correo normalizado: un
+   SHA-256 sin clave se podría revertir probando un diccionario con los correos del centro o recorriendo el
+   espacio IPv4.
 4. **IP del cliente**: se toma de `X-Forwarded-For` contando `TRUSTED_PROXY_HOPS` entradas desde la
    derecha, nunca la entrada de más a la izquierda (la controla el cliente). Si no se puede determinar,
    se usa la clave compartida `unknown`. Sin esto, tras el proxy inverso del H6 un atacante esquivaría
@@ -59,3 +60,7 @@ reinicios de la web y ser atómicos ante peticiones concurrentes.
 - **2026-11-22:** revisión de seguridad del H1. Se cambia el SHA-256 sin clave del correo por HMAC con
   `RATE_LIMIT_KEY_SECRET` y se fija la extracción de la IP del cliente (`TRUSTED_PROXY_HOPS`). La
   decisión de fondo (ventana fija en PostgreSQL) no cambia.
+- **2026-11-24 (T1.11):** la IP también se seudonimiza con HMAC, como ya exigía la spec 02 §5.6 («las claves
+  no contienen datos personales en claro»); el ejemplo anterior la dejaba en claro. Se verifica que Next.js
+  solo rellena `X-Forwarded-For` si el cliente no la envía, así que `TRUSTED_PROXY_HOPS = 0` queda
+  restringido a local y `env.ts` lo rechaza en production.

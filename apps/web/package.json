@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run --project unit",
     "test:coverage": "vitest run --project unit --coverage",
+    "test:coverage:full": "vitest run --mode full --coverage",
     "test:integration": "vitest run --project integration",
     "test:e2e": "playwright test",
     "postinstall": "prisma generate",

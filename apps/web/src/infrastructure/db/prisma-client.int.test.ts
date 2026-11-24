@@ -5,7 +5,8 @@
  */
 import { afterAll, afterEach, beforeEach, describe, expect, inject, it, vi } from "vitest";
 import type { UserRole } from "./generated/prisma/client";
-import { createPrismaClient, InvalidDatabaseQueryError } from "./prisma-client";
+import { resetEnvForTests } from "@/lib/env";
+import { createPrismaClient, getPrismaClient, InvalidDatabaseQueryError } from "./prisma-client";
 
 const { testUrl } = inject("testDatabase");
 const prisma = createPrismaClient(testUrl);
@@ -51,6 +52,30 @@ function expectNoPersonalData(text: string): void {
   expect(text).not.toContain(SECRET_HASH);
   expect(text).not.toContain("Nombre Privado");
 }
+
+describe("T1.7 getPrismaClient", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    resetEnvForTests();
+  });
+
+  it("usa DATABASE_URL del entorno validado y reutiliza el mismo cliente (un solo pool por proceso)", async () => {
+    for (const [name, value] of Object.entries({
+      APP_ENV: "test",
+      APP_ORIGIN: "http://localhost:3000",
+      RATE_LIMIT_KEY_SECRET: "r".repeat(32),
+      DATABASE_URL: testUrl,
+      SOLVER_URL: "http://solver:8000",
+      SOLVER_SERVICE_TOKEN: "s".repeat(32),
+    })) {
+      vi.stubEnv(name, value);
+    }
+    const client = getPrismaClient();
+    expect(getPrismaClient()).toBe(client);
+    await expect(client.$queryRaw`SELECT 1 AS ok`).resolves.toEqual([{ ok: 1 }]);
+    await client.$disconnect();
+  });
+});
 
 describe("T1.7 errores de Prisma sin datos de la operación [CLAUDE.md §3.4]", () => {
   it("un error de validación no reproduce los argumentos ni en el error ni en los logs", async () => {

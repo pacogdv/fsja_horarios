@@ -907,15 +907,22 @@ cerrado con el nonce. Las fuentes se sirven desde la propia app (`next/font/loca
     que `Origin` coincida con `APP_ORIGIN`.
   - Ningún `GET` tiene efectos secundarios.
 - **Rate limiting** (`pg-rate-limiter.ts`, ventana fija en la tabla `rate_limit_bucket`, operación
-  atómica con `INSERT … ON CONFLICT DO UPDATE`). Las claves no contienen datos personales en claro:
-  el correo se incluye como `HMAC-SHA256(RATE_LIMIT_KEY_SECRET, email normalizado)`. Un hash sin clave se
-  podría revertir con un diccionario de correos del centro (ADR-0008).
+  atómica con `INSERT … ON CONFLICT DO UPDATE`). Las claves no contienen datos personales en claro: el
+  correo y la IP (dato personal según el RGPD) se incluyen como `HMAC-SHA256(RATE_LIMIT_KEY_SECRET,
+  "<tipo>:<valor>")`, con el correo normalizado. Un hash sin clave se podría revertir con un diccionario de
+  correos del centro o recorriendo el espacio IPv4 (ADR-0008).
 - **IP del cliente**: se obtiene **solo** de la cadena `X-Forwarded-For`, contando
   `TRUSTED_PROXY_HOPS` saltos desde la **derecha** (las entradas que añaden los proxies de confianza). Nunca
-  se usa la entrada de más a la izquierda, porque la controla el cliente. Con `TRUSTED_PROXY_HOPS = 0` se
-  usa la dirección que añade el propio servidor Next.js. T1.11 verifica empíricamente este comportamiento
-  en el servidor standalone. Si la IP no se puede determinar, se usa la clave `unknown`, que comparte
-  límite (el comportamiento seguro por defecto).
+  se usa la entrada de más a la izquierda, porque la controla el cliente. Con `TRUSTED_PROXY_HOPS = n ≥ 1`
+  se toma la n-ésima entrada desde la derecha (la que añade el proxy de confianza más externo). Si la IP no
+  se puede determinar (cabecera ausente, con menos de n entradas o entrada que no es una IP), se usa la
+  clave `unknown`, que comparte límite (el comportamiento seguro por defecto).
+- **`TRUSTED_PROXY_HOPS = 0` solo vale en local** (verificado en T1.11 con el servidor standalone de
+  Next.js 16): Next.js solo rellena `X-Forwarded-For` con la dirección del socket **si la cabecera no
+  viene en la petición** (`??=`). Si el cliente la envía, llega tal cual, así que la IP que se obtiene es
+  falsificable. Por eso, en local se usa la última entrada (que solo es fiable sin cabecera del cliente) y
+  la validación del entorno **rechaza `APP_ENV=production` con `TRUSTED_PROXY_HOPS = 0`**: en producción la
+  web debe estar detrás del proxy inverso del H6, que sobrescribe o completa la cabecera.
 
 | Operación | Límite |
 |-----------|--------|

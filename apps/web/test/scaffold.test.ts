@@ -65,6 +65,10 @@ describe("T1.3 package.json", () => {
   it("define test:coverage, que mide la cobertura del proyecto unit (revisión de seguridad de H1)", () => {
     expect(packageJson.scripts["test:coverage"]).toBe("vitest run --project unit --coverage");
   });
+
+  it("define test:coverage:full: unit + integración, con umbral también en src/infrastructure (requiere BD)", () => {
+    expect(packageJson.scripts["test:coverage:full"]).toBe("vitest run --mode full --coverage");
+  });
 });
 
 describe("T1.3 next.config.ts", () => {
@@ -78,10 +82,21 @@ describe("T1.3 next.config.ts", () => {
 });
 
 describe("T1.3 vitest.config.ts", () => {
-  it("declara los proyectos unit (jsdom) e integration (node)", async () => {
-    const { default: vitestConfig } = (await import("../vitest.config")) as {
-      default: { test?: { projects?: { test?: { name?: string; environment?: string } }[] } };
+  interface ResolvedVitestConfig {
+    test?: {
+      projects?: { test?: { name?: string; environment?: string } }[];
+      coverage?: { thresholds?: Record<string, unknown> };
     };
+  }
+  async function vitestConfigFor(mode: string): Promise<ResolvedVitestConfig> {
+    const { default: config } = (await import("../vitest.config")) as {
+      default: (env: { mode: string; command: "serve" | "build" }) => ResolvedVitestConfig;
+    };
+    return config({ mode, command: "serve" });
+  }
+
+  it("declara los proyectos unit (jsdom) e integration (node)", async () => {
+    const vitestConfig = await vitestConfigFor("test");
     const projects = (vitestConfig.test?.projects ?? []).map((project) => ({
       name: project.test?.name,
       environment: project.test?.environment,
@@ -90,6 +105,15 @@ describe("T1.3 vitest.config.ts", () => {
       { name: "unit", environment: "jsdom" },
       { name: "integration", environment: "node" },
     ]);
+  });
+
+  it("umbral de cobertura ≥ 90 % en src/domain; con --mode full, también en src/infrastructure", async () => {
+    const strict = { lines: 90, branches: 90, functions: 90, statements: 90 };
+    expect((await vitestConfigFor("test")).test?.coverage?.thresholds).toEqual({ "src/domain/**": strict });
+    expect((await vitestConfigFor("full")).test?.coverage?.thresholds).toEqual({
+      "src/domain/**": strict,
+      "src/infrastructure/**": strict,
+    });
   });
 });
 

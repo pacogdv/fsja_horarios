@@ -35,6 +35,7 @@ Los crea T1.2, T1.3 y T1.5. Cada tarea cita el suyo.
 | Puerta global | `pnpm check` | Lint + tipos de web (`eslint`, `tsc --noEmit`) y del solver (`ruff check`, `ruff format --check`, `mypy --strict`), más los tests de `scripts/tests/` (los de Docker Compose, solo si hay CLI de Docker) |
 | Web unit | `pnpm --filter web exec vitest run --project unit <ruta>` | — |
 | Web cobertura | `pnpm --filter web run test:coverage` (lo ejecuta `pnpm test`) | Umbral ≥ 90 % en `src/domain/**` (líneas, ramas, funciones y sentencias); la infraestructura se cubre con tests de integración |
+| Web cobertura completa | `pnpm --filter web run test:coverage:full` | Unit + integración (requiere `docker compose up -d db`); umbral ≥ 90 % también en `src/infrastructure/**`. Lo ejecuta CI (T1.18) |
 | Web integración | `pnpm --filter web exec vitest run --project integration <ruta>` | `docker compose up -d db` (BD `fsja_test`, reiniciada por la configuración global de Vitest) |
 | Web E2E | `pnpm --filter web exec playwright test <spec>` | `docker compose up -d --wait` |
 | Solver | `uv run --directory services/solver pytest <ruta>` | — |
@@ -67,7 +68,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - [x] T1.8 Política de acceso (RBAC)
 - [x] T1.9 Hash de contraseñas Argon2id
 - [x] T1.10 Almacén de sesiones
-- [ ] T1.11 Rate limiter en PostgreSQL
+- [x] T1.11 Rate limiter en PostgreSQL
 - [ ] T1.12 Casos de uso de login y logout
 - [ ] T1.13 Guardas de servidor y CSRF
 - [ ] T1.14 Middleware y cabeceras de seguridad
@@ -294,7 +295,8 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
     - con `X-Forwarded-For` falsificado por el cliente (más entradas a la izquierda), la IP no cambia;
     - una cabecera ausente o malformada da `unknown`;
     - se verifica y documenta en el test cómo llega la IP en el servidor standalone de Next.js con
-      `TRUSTED_PROXY_HOPS = 0`.
+      `TRUSTED_PROXY_HOPS = 0`. Resultado: si el cliente envía `X-Forwarded-For`, llega tal cual (02 §5.6),
+      así que `env.ts` rechaza `APP_ENV=production` con `TRUSTED_PROXY_HOPS = 0` (test en `env.test.ts`).
   - `rate-limit-keys` construye las claves con el correo en `HMAC-SHA256(RATE_LIMIT_KEY_SECRET, email)`.
     El test comprueba que la clave no contiene el correo ni su SHA-256 sin clave.
 - **Refs:** [02 §5.6]
@@ -313,7 +315,8 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
     en `audit_log`.
   - Un hash obsoleto se rehashea tras un login correcto.
   - Tras un login correcto se revoca la sesión previa del navegador, si la había (fijación de sesión), y se
-    llama a `SessionStore.purgeExpired` (purga oportunista de T1.10, ADR-0002).
+    llama a `SessionStore.purgeExpired` y a `RateLimiter.purgeExpired` (purgas oportunistas de T1.10 y
+    T1.11, ADR-0002 y ADR-0008).
   - Los logins correctos y fallidos se registran en `audit_log`, nunca con la contraseña.
 - **Refs:** [02 §5.2], [CLAUDE.md §3.1]
 - **Test:** `pnpm --filter web exec vitest run --project unit src/application/auth`
@@ -385,7 +388,8 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 #### T1.18 — Integración continua
 - **Archivos:** `.github/workflows/ci.yml`.
 - **Criterios de aceptación:**
-  - Trabajos: `check` (incluye los tests de `scripts/tests/`), `web-unit`, `web-integration` (servicio postgres:16), `solver-tests` (con
+  - Trabajos: `check` (incluye los tests de `scripts/tests/`), `web-unit`, `web-integration` (servicio postgres:16,
+    con `test:coverage:full`: umbral ≥ 90 % en `src/domain` y `src/infrastructure`), `solver-tests` (con
     cobertura), `docker-build`, `e2e` (compose completo y artefacto del informe de Playwright).
   - Usa caché de pnpm y uv.
   - Ejecuta `pnpm check` con `CHECK_REQUIRE_ALL=1`, de modo que un componente ausente hace fallar CI.

@@ -185,8 +185,9 @@ expect "typecheck: delega en ambos lados" \
   '[ "$CODE" -eq 0 ] && logged "pnpm --filter web run typecheck" && logged "uv run --directory services/solver mypy --strict src"'
 
 make_root yes yes pass; run_check test
-expect "test: delega en ambos lados" \
-  '[ "$CODE" -eq 0 ] && logged "pnpm --filter web run test" && logged "uv run --directory services/solver pytest"'
+# La web ejecuta sus tests unitarios con medición de cobertura y umbral (src/domain ≥ 90 %).
+expect "test: delega en ambos lados (web con cobertura)" \
+  '[ "$CODE" -eq 0 ] && logged "pnpm --filter web run test:coverage" && logged "uv run --directory services/solver pytest"'
 
 make_root yes yes pass; run_check test:e2e
 expect "test:e2e: solo delega en la web" \

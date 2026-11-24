@@ -6,6 +6,18 @@ export default defineConfig({
     alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) },
   },
   test: {
+    // Solo con --coverage (`pnpm test:coverage`, que ejecuta `pnpm test` en la raíz). specs/03-tasks.md §0.3.
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.test.{ts,tsx}", "src/infrastructure/db/generated/**"],
+      reporter: ["text-summary", "text"],
+      // El dominio es TS puro y se cubre con tests unitarios. La infraestructura (BD, red) se cubre con los
+      // tests de integración, que no cuentan aquí.
+      thresholds: {
+        "src/domain/**": { lines: 90, branches: 90, functions: 90, statements: 90 },
+      },
+    },
     projects: [
       {
         extends: true,

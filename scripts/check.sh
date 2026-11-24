@@ -95,7 +95,8 @@ compose_tests() {
 }
 
 task_test() {
-  web test
+  # Tests unitarios con cobertura y umbral (src/domain ≥ 90 %; specs/03-tasks.md §0.3).
+  web test:coverage
   solver "pytest" pytest
 }
 

@@ -61,6 +61,10 @@ describe("T1.3 package.json", () => {
     expect(packageJson.scripts.test).toBe("vitest run --project unit");
     expect(packageJson.scripts["test:e2e"]).toMatch(/^playwright test\b/);
   });
+
+  it("define test:coverage, que mide la cobertura del proyecto unit (revisión de seguridad de H1)", () => {
+    expect(packageJson.scripts["test:coverage"]).toBe("vitest run --project unit --coverage");
+  });
 });
 
 describe("T1.3 next.config.ts", () => {

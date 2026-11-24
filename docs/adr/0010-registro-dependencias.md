@@ -64,6 +64,7 @@ Criterios de admisión de una dependencia:
 |-------------|--------|----------|-----|------------------------|
 | ESLint | web (dev) | MIT | Lint y reglas de capas | — |
 | @types/pg | web (dev) | MIT | Tipos de `pg` para TypeScript estricto | — |
+| @vitest/coverage-v8 | web (dev) | MIT | Cobertura de Vitest con umbral en `src/domain` (≥ 90 %) | `@vitest/coverage-istanbul`: instrumenta el código y es más lento |
 | eslint-config-next | web (dev) | MIT | Reglas de Next.js, React, hooks, accesibilidad (jsx-a11y) y TypeScript (incluye typescript-eslint, que aporta `no-explicit-any`) | Configurar cada plugin a mano: más mantenimiento y riesgo de omitir reglas de accesibilidad |
 | @tailwindcss/postcss | web (dev) | MIT | Plugin PostCSS de Tailwind CSS v4 (parte de Tailwind) | — |
 | @types/node, @types/react, @types/react-dom | web (dev) | MIT | Tipos para TypeScript estricto | — |
@@ -141,3 +142,5 @@ versión de uv; las imágenes oficiales se reconstruyen con parches de seguridad
 - **2026-11-24 (T1.7):** se instala **Prisma 7** (`prisma`, `@prisma/client`). Prisma 7 elimina el motor de
   consultas nativo y exige un *driver adapter*, así que se registran `@prisma/adapter-pg` y `pg` (más
   `@types/pg`). Prisma 8 sigue en *release candidate*.
+- **2026-11-24 (revisión de H1):** se añade `@vitest/coverage-v8` (misma versión que Vitest) para medir la
+  cobertura de la web con umbral en `src/domain`.

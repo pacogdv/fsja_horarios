@@ -34,6 +34,7 @@ Los crea T1.2, T1.3 y T1.5. Cada tarea cita el suyo.
 |-------|---------|------------|
 | Puerta global | `pnpm check` | Lint + tipos de web (`eslint`, `tsc --noEmit`) y del solver (`ruff check`, `ruff format --check`, `mypy --strict`), más los tests de `scripts/tests/` (los de Docker Compose, solo si hay CLI de Docker) |
 | Web unit | `pnpm --filter web exec vitest run --project unit <ruta>` | — |
+| Web cobertura | `pnpm --filter web run test:coverage` (lo ejecuta `pnpm test`) | Umbral ≥ 90 % en `src/domain/**` (líneas, ramas, funciones y sentencias); la infraestructura se cubre con tests de integración |
 | Web integración | `pnpm --filter web exec vitest run --project integration <ruta>` | `docker compose up -d db` (BD `fsja_test`, reiniciada por la configuración global de Vitest) |
 | Web E2E | `pnpm --filter web exec playwright test <spec>` | `docker compose up -d --wait` |
 | Solver | `uv run --directory services/solver pytest <ruta>` | — |
@@ -63,7 +64,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - [x] T1.5 Andamiaje de `services/solver`
 - [x] T1.6 Dockerfiles y Docker Compose
 - [x] T1.7 Prisma: identidad y curso
-- [ ] T1.8 Política de acceso (RBAC)
+- [x] T1.8 Política de acceso (RBAC)
 - [ ] T1.9 Hash de contraseñas Argon2id
 - [ ] T1.10 Almacén de sesiones
 - [ ] T1.11 Rate limiter en PostgreSQL

@@ -149,6 +149,24 @@ else
     report ok "ci-env.sh: no imprime los secretos"
   fi
 
+  # Como en GitHub Actions: enmascara cada secreto en los logs (stdout del script) sin que la orden de
+  # enmascarado acabe dentro del .env. Pasó en la primera ejecución de CI: el .env quedó con valores de dos
+  # líneas, DATABASE_URL no era válida y web no arrancaba.
+  if GITHUB_ACTIONS=true "$CI_ENV" "$WORK/gha.env" > "$WORK/gha.out" 2>&1; then
+    masks="$(grep -c '^::add-mask::[0-9a-f]\{64\}$' "$WORK/gha.out")"
+    if grep -q 'add-mask' "$WORK/gha.env" || [ "$(grep -cvE '^([A-Z_][A-Z0-9_]*=.*|#.*|)$' "$WORK/gha.env")" -ne 0 ]; then
+      report fail "ci-env.sh en GitHub Actions: el .env solo tiene líneas VARIABLE=valor" "$(grep -nvE '^([A-Z_][A-Z0-9_]*=.*|#.*|)$' "$WORK/gha.env" | cut -c1-40)"
+    elif [ "$masks" -ne 6 ] || ! grep -q "^::add-mask::postgresql://" "$WORK/gha.out"; then
+      report fail "ci-env.sh en GitHub Actions: enmascara los 6 secretos y DATABASE_URL" "$masks secretos enmascarados"
+    elif [ "$(env_value "$WORK/gha.env" DATABASE_URL)" != "postgresql://fsja:$(env_value "$WORK/gha.env" POSTGRES_PASSWORD)@db:5432/fsja" ]; then
+      report fail "ci-env.sh en GitHub Actions: DATABASE_URL válida" "DATABASE_URL no coincide con POSTGRES_PASSWORD"
+    else
+      report ok "ci-env.sh en GitHub Actions: enmascara los 6 secretos y DATABASE_URL, y el .env solo tiene líneas VARIABLE=valor"
+    fi
+  else
+    report fail "ci-env.sh en GitHub Actions: genera el archivo" "$(cat "$WORK/gha.out")"
+  fi
+
   if command -v docker > /dev/null 2>&1; then
     if docker compose --project-directory "$ROOT" -f "$ROOT/docker-compose.yml" --env-file "$WORK/a.env" config -q > "$WORK/config.err" 2>&1; then
       report ok "ci-env.sh: docker compose acepta el .env generado"

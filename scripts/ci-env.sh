@@ -14,27 +14,37 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 random_hex() { od -An -tx1 -N32 /dev/urandom | tr -d ' \n'; } # 32 bytes → 64 caracteres hexadecimales
 
-secret() { # secret: valor aleatorio, enmascarado en los logs de GitHub Actions
-  local value
-  value="$(random_hex)"
-  if [ "${GITHUB_ACTIONS:-}" = "true" ]; then echo "::add-mask::$value"; fi
-  printf '%s' "$value"
+# new_secret <variable>: guarda un valor aleatorio en la variable de shell y, en GitHub Actions, lo enmascara.
+# No se usa $(...): la orden ::add-mask:: va a stdout y acabaría dentro del valor (fallo de la primera ejecución
+# de CI, cubierto por ci.test.sh).
+new_secret() {
+  printf -v "$1" '%s' "$(random_hex)"
+  if [ "${GITHUB_ACTIONS:-}" = "true" ]; then echo "::add-mask::${!1}"; fi
 }
 
-postgres_password="$(secret)"
+new_secret rate_limit_key_secret
+new_secret postgres_password
+new_secret solver_service_token
+new_secret seed_admin_password
+new_secret seed_teacher_password
+new_secret seed_guest_password
+# El valor de DATABASE_URL incluye la contraseña de PostgreSQL: se enmascara también la URL completa.
+database_url="postgresql://fsja:$postgres_password@db:5432/fsja"
+if [ "${GITHUB_ACTIONS:-}" = "true" ]; then echo "::add-mask::$database_url"; fi
+
 overrides="APP_ENV=development
 APP_ORIGIN=http://localhost:3000
 TRUSTED_PROXY_HOPS=0
-RATE_LIMIT_KEY_SECRET=$(secret)
+RATE_LIMIT_KEY_SECRET=$rate_limit_key_secret
 POSTGRES_USER=fsja
 POSTGRES_DB=fsja
 POSTGRES_PASSWORD=$postgres_password
-DATABASE_URL=postgresql://fsja:$postgres_password@db:5432/fsja
-SOLVER_SERVICE_TOKEN=$(secret)
+DATABASE_URL=$database_url
+SOLVER_SERVICE_TOKEN=$solver_service_token
 SEED_ON_START=true
-SEED_ADMIN_PASSWORD=$(secret)
-SEED_TEACHER_PASSWORD=$(secret)
-SEED_GUEST_PASSWORD=$(secret)"
+SEED_ADMIN_PASSWORD=$seed_admin_password
+SEED_TEACHER_PASSWORD=$seed_teacher_password
+SEED_GUEST_PASSWORD=$seed_guest_password"
 
 # Copia .env.example sustituyendo los valores de las variables de $overrides; el resto queda como en el ejemplo.
 umask 077

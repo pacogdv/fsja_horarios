@@ -14,7 +14,9 @@ WORKDIR /repo
 
 FROM base AS deps
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/web/package.json apps/web/
+COPY apps/web/package.json apps/web/prisma.config.ts apps/web/
+# `postinstall` genera el cliente de Prisma: necesita el esquema (no la BD).
+COPY apps/web/prisma apps/web/prisma
 RUN pnpm install --frozen-lockfile --filter web
 
 FROM deps AS build

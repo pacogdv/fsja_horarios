@@ -62,7 +62,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - [x] T1.4 Variables de entorno validadas
 - [x] T1.5 Andamiaje de `services/solver`
 - [x] T1.6 Dockerfiles y Docker Compose
-- [ ] T1.7 Prisma: identidad y curso
+- [x] T1.7 Prisma: identidad y curso
 - [ ] T1.8 Política de acceso (RBAC)
 - [ ] T1.9 Hash de contraseñas Argon2id
 - [ ] T1.10 Almacén de sesiones
@@ -229,9 +229,13 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - **Archivos:**
   - `apps/web/prisma/schema.prisma` (`app_user`, `user_session`, `rate_limit_bucket`, `audit_log`,
     `school`, `academic_year`).
-  - `prisma/migrations/0001_init/` (más el SQL de las extensiones `citext` y `btree_gist`).
+  - `prisma/migrations/0001_init/` (extensiones `citext` y `btree_gist` e índice único parcial, que Prisma 7
+    expresa con las *preview features* `postgresqlExtensions` y `partialIndexes`) y `apps/web/prisma.config.ts`.
   - `src/infrastructure/db/prisma-client.ts`.
-  - `apps/web/test/integration/global-setup.ts` (reinicia `fsja_test`).
+  - `apps/web/test/integration/global-setup.ts` (reinicia `fsja_test`) y `test-database.ts` (solo acepta BD
+    `*_test`; `TEST_DATABASE_URL` en `.env.example`).
+  - `docker-compose.override.yml` (desarrollo): publica `db` en `127.0.0.1:5432`, porque Docker no publica
+    puertos de contenedores que solo están en redes internas.
   - `src/infrastructure/db/schema.int.test.ts`.
 - **Criterios de aceptación:**
   - `prisma migrate deploy` se aplica sobre una BD vacía.

@@ -53,7 +53,9 @@ Criterios de admisión de una dependencia:
 | Radix UI | web | MIT | Primitivas accesibles (dependencia de shadcn/ui) | — |
 | TanStack Query | web | MIT | Caché y estado de servidor en el cliente | Impuesto por `CLAUDE.md` §1.2 |
 | Zod | web | MIT | Validación de entradas, entorno y contrato | Impuesto por `CLAUDE.md` §1.2 |
-| Prisma | web | Apache-2.0 | ORM y migraciones (ADR-0001) | Drizzle (ver ADR-0001) |
+| Prisma | web | Apache-2.0 | ORM y migraciones (ADR-0001): `prisma` (CLI, dev) y `@prisma/client` | Drizzle (ver ADR-0001) |
+| @prisma/adapter-pg | web | Apache-2.0 | *Driver adapter* de PostgreSQL, obligatorio en Prisma 7 (cliente sin motor nativo) | `@prisma/adapter-neon` y similares: específicos de un proveedor |
+| pg (node-postgres) | web | MIT | Driver de PostgreSQL que usa `@prisma/adapter-pg`; en tests, reinicio de la BD `fsja_test` | `postgres` (porsager): no lo admite el adaptador oficial de Prisma |
 | @node-rs/argon2 | web | MIT | Hash Argon2id (ADR-0002) | `argon2` (node-gyp): requiere toolchain de compilación en la imagen; bcrypt: menos resistente a GPU |
 
 **`apps/web`, desarrollo y tests**
@@ -61,6 +63,7 @@ Criterios de admisión de una dependencia:
 | Dependencia | Ámbito | Licencia | Uso | Alternativa descartada |
 |-------------|--------|----------|-----|------------------------|
 | ESLint | web (dev) | MIT | Lint y reglas de capas | — |
+| @types/pg | web (dev) | MIT | Tipos de `pg` para TypeScript estricto | — |
 | eslint-config-next | web (dev) | MIT | Reglas de Next.js, React, hooks, accesibilidad (jsx-a11y) y TypeScript (incluye typescript-eslint, que aporta `no-explicit-any`) | Configurar cada plugin a mano: más mantenimiento y riesgo de omitir reglas de accesibilidad |
 | @tailwindcss/postcss | web (dev) | MIT | Plugin PostCSS de Tailwind CSS v4 (parte de Tailwind) | — |
 | @types/node, @types/react, @types/react-dom | web (dev) | MIT | Tipos para TypeScript estricto | — |
@@ -135,3 +138,6 @@ versión de uv; las imágenes oficiales se reconstruyen con parches de seguridad
 - **2026-11-22 (T1.5):** se sustituye HTTPX por **httpx2** (sucesor mantenido por la organización de Pydantic, mismo autor y licencia), porque Starlette 1.10 declara obsoleto `httpx` en `TestClient`.
 - **2026-11-24 (T1.6):** se registran las imágenes base Docker. uv se fija en 0.13.7, la última 0.13.x con
   al menos dos semanas de antigüedad (compatible con `uv_build>=0.13,<0.14`).
+- **2026-11-24 (T1.7):** se instala **Prisma 7** (`prisma`, `@prisma/client`). Prisma 7 elimina el motor de
+  consultas nativo y exige un *driver adapter*, así que se registran `@prisma/adapter-pg` y `pg` (más
+  `@types/pg`). Prisma 8 sigue en *release candidate*.

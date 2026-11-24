@@ -1,0 +1,18 @@
+# Solo DESARROLLO (specs/02-architecture-plan.md §1.4; specs/03-tasks.md §0.3 y T1.7).
+# Docker Compose lo combina automáticamente con docker-compose.yml.
+#
+# Publica PostgreSQL en 127.0.0.1:5432 para que los tests de integración y el CLI de Prisma lleguen a la BD
+# desde el host (`docker compose up -d db`). Docker no publica puertos de contenedores que solo están en
+# redes internas, así que db se une además a db_dev, una red propia que no comparten solver ni web.
+# Producción (H6) no usa este archivo.
+
+services:
+  db:
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks:
+      - backend
+      - db_dev
+
+networks:
+  db_dev: {}

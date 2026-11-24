@@ -21,6 +21,10 @@ export default defineConfig({
         test: {
           name: "integration",
           environment: "node",
+          // Recrea fsja_test y le aplica las migraciones (T1.7).
+          globalSetup: ["test/integration/global-setup.ts"],
+          // Los tests comparten la BD: se ejecutan en serie para no interferir entre sí.
+          fileParallelism: false,
           include: ["src/**/*.int.test.ts", "test/**/*.int.test.ts", "prisma/**/*.int.test.ts"],
         },
       },

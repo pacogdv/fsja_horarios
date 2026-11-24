@@ -1,0 +1,141 @@
+// Esquema de PostgreSQL. `apps/web` es su única dueña (ADR-0001).
+// Diseño: specs/02-architecture-plan.md §2. Convenciones (§2.1):
+// - tablas y columnas en snake_case inglés (@@map / @map); modelos en PascalCase;
+// - claves primarias UUID v7 generadas en la aplicación;
+// - created_at (not null, default now()) y updated_at en todas las tablas.
+// Lo que Prisma no expresa (CHECK, EXCLUDE, triggers) va como SQL manual en la migración que lo introduce.
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/infrastructure/db/generated/prisma"
+  // partialIndexes: índices únicos parciales (un curso vigente por centro) sin deriva en `migrate diff`.
+  // postgresqlExtensions: las extensiones forman parte del esquema y de su comparación.
+  previewFeatures = ["partialIndexes", "postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [citext, btree_gist]
+}
+
+// -------------------------------------------------------------------------------------------------
+// §2.2 Identidad, sesiones y auditoría
+// -------------------------------------------------------------------------------------------------
+
+enum UserRole {
+  ADMIN_DIRECCION
+  DOCENTE
+  INVITADO_DEMO
+
+  @@map("user_role")
+}
+
+model AppUser {
+  id               String    @id @default(uuid(7)) @db.Uuid
+  /// citext: el correo no distingue mayúsculas en la unicidad ni en las búsquedas.
+  email            String    @unique @db.Citext
+  /// Hash Argon2id (formato PHC). Nunca la contraseña en claro.
+  passwordHash     String    @map("password_hash")
+  displayName      String    @map("display_name")
+  role             UserRole
+  isActive         Boolean   @default(true) @map("is_active")
+  failedLoginCount Int       @default(0) @map("failed_login_count") @db.SmallInt
+  lockedUntil      DateTime? @map("locked_until") @db.Timestamptz(6)
+  lastLoginAt      DateTime? @map("last_login_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sessions  UserSession[]
+  auditLogs AuditLog[]
+
+  @@map("app_user")
+}
+
+model UserSession {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  /// SHA-256 del token de sesión: el token en claro solo existe en la cookie (§5.2).
+  tokenHash     Bytes     @unique @map("token_hash")
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(6)
+  idleExpiresAt DateTime  @map("idle_expires_at") @db.Timestamptz(6)
+  ip            String?   @db.Inet
+  userAgent     String?   @map("user_agent")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("user_session")
+}
+
+model RateLimitBucket {
+  /// Clave seudonimizada (HMAC del correo, nunca en claro; ADR-0008).
+  key         String
+  windowStart DateTime  @map("window_start") @db.Timestamptz(6)
+  count       Int
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@id([key, windowStart])
+  @@map("rate_limit_bucket")
+}
+
+model AuditLog {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  /// SET NULL: borrar un usuario no borra su rastro de auditoría.
+  userId     String?   @map("user_id") @db.Uuid
+  action     String
+  entityType String    @map("entity_type")
+  entityId   String?   @map("entity_id") @db.Uuid
+  metadata   Json      @default("{}")
+  at         DateTime  @default(now()) @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user AppUser? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([at])
+  @@map("audit_log")
+}
+
+// -------------------------------------------------------------------------------------------------
+// §2.3 Centro y curso
+// -------------------------------------------------------------------------------------------------
+
+model School {
+  id        String    @id @default(uuid(7)) @db.Uuid
+  name      String
+  /// Zona horaria IANA del centro (p. ej., Europe/Madrid).
+  timezone  String
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  academicYears AcademicYear[]
+
+  @@map("school")
+}
+
+model AcademicYear {
+  id           String    @id @default(uuid(7)) @db.Uuid
+  schoolId     String    @map("school_id") @db.Uuid
+  /// Formato 2026-2027.
+  name         String
+  startsOn     DateTime  @map("starts_on") @db.Date
+  endsOn       DateTime  @map("ends_on") @db.Date
+  isCurrent    Boolean   @default(false) @map("is_current")
+  clonedFromId String?   @map("cloned_from_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime? @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  school     School         @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  clonedFrom AcademicYear?  @relation("AcademicYearClone", fields: [clonedFromId], references: [id], onDelete: SetNull)
+  clones     AcademicYear[] @relation("AcademicYearClone")
+
+  @@unique([schoolId, name])
+  /// Un único curso vigente por centro.
+  @@unique([schoolId], map: "academic_year_one_current_per_school", where: { isCurrent: true })
+  @@map("academic_year")
+}

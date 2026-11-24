@@ -45,12 +45,12 @@ write_env() { # write_env <archivo> [VARIABLE_A_OMITIR]
   } | grep -v "^${2:-__NINGUNA__}=" > "$1"
 }
 
-compose_config() { # compose_config <env-file>: imprime la configuración normalizada en JSON.
-  local unset_args="" variable
+compose_config() { # compose_config <env-file> [archivos compose adicionales...]: configuración normalizada en JSON.
+  local env_file="$1" unset_args="" variable file files="-f $ROOT/docker-compose.yml"; shift
   for variable in $COMPOSE_VARIABLES; do unset_args="$unset_args -u $variable"; done
-  # shellcheck disable=SC2086  # unset_args se divide en argumentos a propósito.
-  env $unset_args docker compose --project-directory "$ROOT" -f "$ROOT/docker-compose.yml" \
-    --env-file "$1" config --format json
+  for file in "$@"; do files="$files -f $file"; done
+  # shellcheck disable=SC2086  # unset_args y files se dividen en argumentos a propósito.
+  env $unset_args docker compose --project-directory "$ROOT" $files --env-file "$env_file" config --format json
 }
 
 # --------------------------------------------------------------------------------------------------
@@ -150,6 +150,46 @@ elif [ -z "$hardcoded" ]; then
 else
   report fail "docker-compose.yml no contiene secretos escritos a mano" "$hardcoded"
 fi
+
+# --------------------------------------------------------------------------------------------------
+# 1b. docker-compose.override.yml (solo desarrollo, T1.7)
+# Docker no publica puertos de contenedores que solo están en redes internas: para que los tests de
+# integración y Prisma lleguen a PostgreSQL desde el host, el override añade a db una red no interna y
+# publica el 5432 solo en 127.0.0.1 [02 §1.4]. El resto de servicios no cambia.
+# --------------------------------------------------------------------------------------------------
+
+if [ ! -f "$ROOT/docker-compose.override.yml" ]; then
+  report fail "existe docker-compose.override.yml (desarrollo)" "falta $ROOT/docker-compose.override.yml"
+elif compose_config "$WORK/valid.env" "$ROOT/docker-compose.override.yml" > "$WORK/dev.json" 2> "$WORK/dev.err"; then
+  report ok "existe docker-compose.override.yml (desarrollo) y es válido"
+else
+  report fail "existe docker-compose.override.yml (desarrollo) y es válido" "$(cat "$WORK/dev.err")"
+fi
+
+dev() { # dev <descripción> <expresión JS sobre b/d (servicios base/desarrollo) y dn (redes de desarrollo)>
+  local output
+  if [ ! -s "$WORK/dev.json" ]; then report fail "$1" "sin configuración de desarrollo válida"; return; fi
+  if output="$(node -e '
+      const read = (f) => JSON.parse(require("fs").readFileSync(f, "utf8"));
+      const base = read(process.argv[1]), devConfig = read(process.argv[2]);
+      const b = base.services, d = devConfig.services, dn = devConfig.networks || {};
+      const ok = (new Function("b", "d", "dn", "return (" + process.argv[3] + ")"))(b, d, dn);
+      if (ok !== true) { console.error("la condición no se cumple"); process.exit(1); }' \
+      "$WORK/config.json" "$WORK/dev.json" "$2" 2>&1)"; then
+    report ok "$1"
+  else
+    report fail "$1" "$output"
+  fi
+}
+
+dev "desarrollo: db publica el 5432 solo en 127.0.0.1" \
+  'd.db.ports.length === 1 && d.db.ports[0].host_ip === "127.0.0.1" && String(d.db.ports[0].published) === "5432" && d.db.ports[0].target === 5432'
+dev "desarrollo: db sigue en backend" 'Object.keys(d.db.networks).includes("backend")'
+dev "desarrollo: la red extra de db no es compartida por solver ni web" \
+  'Object.keys(d.db.networks).filter(k => k !== "backend").every(k => !(k in d.solver.networks) && !(k in d.web.networks))'
+dev "desarrollo: solver y web no cambian respecto a la configuración base" \
+  'JSON.stringify(d.solver) === JSON.stringify(b.solver) && JSON.stringify(d.web) === JSON.stringify(b.web)'
+dev "desarrollo: backend y solver_net siguen siendo internas" 'dn.backend.internal === true && dn.solver_net.internal === true'
 
 # --------------------------------------------------------------------------------------------------
 # 2. Dockerfiles y contexto de build

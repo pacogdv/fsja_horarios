@@ -18,6 +18,8 @@ build/
 dist/
 next-env.d.ts
 *.tsbuildinfo
+# Cliente de Prisma generado (`prisma generate`, se ejecuta en postinstall).
+apps/web/src/infrastructure/db/generated/
 .vercel/
 .turbo/
 

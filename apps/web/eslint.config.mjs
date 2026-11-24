@@ -90,7 +90,15 @@ export default defineConfig([
   ...nextVitals,
   ...nextTypescript,
 
-  globalIgnores([".next/**", "node_modules/**", "coverage/**", "next-env.d.ts", "test/lint-fixtures/**"]),
+  globalIgnores([
+    ".next/**",
+    "node_modules/**",
+    "coverage/**",
+    "next-env.d.ts",
+    "test/lint-fixtures/**",
+    // Cliente de Prisma generado: no es código del proyecto.
+    "src/infrastructure/db/generated/**",
+  ]),
 
   // --- Seguridad y tipado (todo el código) --------------------------------------------------------
   {

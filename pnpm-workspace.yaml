@@ -7,3 +7,9 @@ minimumReleaseAge: 20160
 
 # Hace cumplir `engines.node` (>= 22) de package.json: con un Node más antiguo, pnpm se niega a instalar.
 engineStrict: true
+
+# pnpm no ejecuta scripts de instalación de dependencias salvo los autorizados aquí. Prisma los necesita para
+# descargar su motor de migraciones (schema-engine). ADR-0010.
+allowBuilds:
+  '@prisma/engines': true
+  prisma: true

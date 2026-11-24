@@ -9,6 +9,7 @@
 #   2. El solver no es accesible desde el host (curl localhost:8000 falla).
 #   3. Desde el contenedor solver, el nombre db no resuelve (no comparte red con la BD).
 #   4. Desde el contenedor web, http://solver:8000/health responde 200.
+#   5. web aplicó las migraciones al arrancar: existen las tablas de T1.7 (T1.16).
 # Compatible con bash 3.2. Requiere docker y curl. Sale con código 1 si algo falla.
 set -uo pipefail
 
@@ -73,6 +74,26 @@ if output="$(compose exec -T web node -e "$fetch_health" 2>&1)"; then
   report ok "desde web, solver:8000/health responde 200"
 else
   report fail "desde web, solver:8000/health responde 200" "resultado: $output"
+fi
+
+# 5. Migraciones aplicadas por el arranque de web (docker-entrypoint.sh, T1.16): tablas de T1.7.
+TABLES="app_user user_session rate_limit_bucket audit_log school academic_year"
+list_tables="SELECT string_agg(table_name, ' ' ORDER BY table_name) FROM information_schema.tables WHERE table_schema = 'public'"
+# Las credenciales se leen dentro del contenedor db (comillas simples: se expanden allí, no en el host). La
+# consulta llega como argumento $1 del sh del contenedor.
+# shellcheck disable=SC2016
+if existing="$(compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "$1"' sh "$list_tables" 2>&1)"; then
+  missing=""
+  for table in $TABLES; do
+    case " $existing " in *" $table "*) ;; *) missing="$missing $table" ;; esac
+  done
+  if [ -z "$missing" ]; then
+    report ok "web aplicó las migraciones: existen las tablas de T1.7"
+  else
+    report fail "web aplicó las migraciones: existen las tablas de T1.7" "faltan:$missing"
+  fi
+else
+  report fail "web aplicó las migraciones: existen las tablas de T1.7" "no se pudo consultar la BD: $existing"
 fi
 
 echo "compose-smoke: $passed ok, $failed fallo(s)."

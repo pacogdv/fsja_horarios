@@ -9,6 +9,8 @@
 **/coverage
 **/*.tsbuildinfo
 **/next-env.d.ts
+# Cliente de Prisma generado en local: la imagen lo genera con su propio `prisma generate`.
+apps/web/src/infrastructure/db/generated
 # Partes del monorepo que la web no necesita.
 .git
 .github

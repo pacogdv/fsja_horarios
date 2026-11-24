@@ -57,7 +57,8 @@ Criterios de admisión de una dependencia:
 | @fontsource-variable/inter | web | OFL-1.1 (fuente) / MIT (paquete) | Inter autoalojada con `next/font/local` (02 §6.2), versionada por el lockfile | `next/font/google`: descarga la fuente en el build (red en Docker); copiar el `.woff2` a mano: sin integridad del lockfile |
 | TanStack Query | web | MIT | Caché y estado de servidor en el cliente | Impuesto por `CLAUDE.md` §1.2 |
 | Zod | web | MIT | Validación de entradas, entorno y contrato | Impuesto por `CLAUDE.md` §1.2 |
-| Prisma | web | Apache-2.0 | ORM y migraciones (ADR-0001): `prisma` (CLI, dev) y `@prisma/client` | Drizzle (ver ADR-0001) |
+| Prisma | web | Apache-2.0 | ORM y migraciones (ADR-0001): `prisma` (CLI; en producción para `migrate deploy` al arrancar, T1.16) y `@prisma/client` | Drizzle (ver ADR-0001) |
+| jiti | web | MIT | Ejecuta el seed en TypeScript (`prisma/seed/run.mjs`) en desarrollo y en la imagen Docker, con el alias `@/` y sin compilar | `tsx`: depende del binario nativo de esbuild (variante musl en Alpine); compilar el seed: otro paso de build y otra herramienta |
 | @prisma/adapter-pg | web | Apache-2.0 | *Driver adapter* de PostgreSQL, obligatorio en Prisma 7 (cliente sin motor nativo) | `@prisma/adapter-neon` y similares: específicos de un proveedor |
 | pg (node-postgres) | web | MIT | Driver de PostgreSQL que usa `@prisma/adapter-pg`; en tests, reinicio de la BD `fsja_test` | `postgres` (porsager): no lo admite el adaptador oficial de Prisma |
 | @node-rs/argon2 | web | MIT | Hash Argon2id (ADR-0002) | `argon2` (node-gyp): requiere toolchain de compilación en la imagen; bcrypt: menos resistente a GPU |
@@ -152,3 +153,9 @@ versión de uv; las imágenes oficiales se reconstruyen con parches de seguridad
   `tailwind-merge`, `class-variance-authority`) y la fuente Inter (`@fontsource-variable/inter`). La licencia
   OFL-1.1 es específica de fuentes y permite usarla y distribuirla con la aplicación, así que es compatible con
   el criterio 1. Se instala Testing Library (ya aprobada): `@testing-library/react`, `user-event` y `jest-dom`.
+- **2026-11-24 (T1.16):**
+  - `prisma` pasa a dependencia de producción: la imagen de la web ejecuta `migrate deploy` al arrancar
+    (spec 02 §1.4).
+  - Se añade `jiti`, que ya estaba en el lockfile como dependencia transitiva de ESLint y Tailwind, para
+    ejecutar el seed en TypeScript. Se verificó que funciona con el cliente generado de Prisma 7 (wasm y
+    adaptador `pg`) y con `@node-rs/argon2`.

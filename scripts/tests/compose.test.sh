@@ -236,5 +236,71 @@ else
   report fail "solver: arranca con la fábrica create_app (T1.5)" "CMD no usa uvicorn solver.api.app:create_app --factory"
 fi
 
+# --------------------------------------------------------------------------------------------------
+# 3. Arranque de la web: migraciones y seed (T1.16; 02 §1.4)
+# --------------------------------------------------------------------------------------------------
+
+ENTRYPOINT_FILE="$ROOT/apps/web/docker-entrypoint.sh"
+web_final="$(final_stage "$ROOT/apps/web/Dockerfile")"
+if printf '%s' "$web_final" | grep -qE '^ENTRYPOINT[[:space:]]+\["/app/docker-entrypoint\.sh"\]'; then
+  report ok "web: la etapa final arranca con docker-entrypoint.sh"
+else
+  report fail "web: la etapa final arranca con docker-entrypoint.sh" "falta ENTRYPOINT [\"/app/docker-entrypoint.sh\"]"
+fi
+if printf '%s' "$web_final" | grep -qE '^CMD[[:space:]]+\["node",[[:space:]]*"apps/web/server\.js"\]'; then
+  report ok "web: el servidor es el CMD que ejecuta el entrypoint"
+else
+  report fail "web: el servidor es el CMD que ejecuta el entrypoint" "falta CMD [\"node\", \"apps/web/server.js\"]"
+fi
+
+# El entrypoint se ejecuta con un `node` simulado que registra cada llamada y falla si se le pide.
+# run_entrypoint <SEED_ON_START> <comando de node que falla, o "-">: deja las llamadas en $WORK/calls.
+run_entrypoint() {
+  local stub="$WORK/stub-bin"
+  mkdir -p "$stub" "$WORK/tools"
+  cat > "$stub/node" <<'STUB'
+#!/bin/sh
+echo "node $*" >> "$CALLS"
+case "$*" in *"$FAIL_ON"*) exit 1 ;; esac
+exit 0
+STUB
+  chmod +x "$stub/node"
+  : > "$WORK/calls"
+  PATH="$stub:$PATH" CALLS="$WORK/calls" FAIL_ON="$2" SEED_ON_START="$1" WEB_TOOLS_DIR="$WORK/tools" \
+    sh "$ENTRYPOINT_FILE" node apps/web/server.js > /dev/null 2>&1
+}
+
+calls() { sed -e 's#node node_modules/prisma/build/index.js migrate deploy#migrate#' \
+  -e 's#node prisma/seed/run.mjs#seed#' -e 's#node apps/web/server.js#server#' "$WORK/calls" | tr '\n' ' ' | sed 's/ $//'; }
+
+check_entrypoint() { # check_entrypoint <descripción> <SEED_ON_START> <falla en> <código esperado: 0 | error> <llamadas esperadas>
+  local code
+  if [ ! -f "$ENTRYPOINT_FILE" ]; then report fail "$1" "falta $ENTRYPOINT_FILE"; return; fi
+  run_entrypoint "$2" "$3"; code=$?
+  if { [ "$4" = 0 ] && [ "$code" -ne 0 ]; } || { [ "$4" = error ] && [ "$code" -eq 0 ]; }; then
+    report fail "$1" "código de salida $code"
+  elif [ "$(calls)" != "$5" ]; then
+    report fail "$1" "llamadas: '$(calls)' (se esperaba '$5')"
+  else
+    report ok "$1"
+  fi
+}
+
+check_entrypoint "entrypoint: sin seed, migra y arranca el servidor" false - 0 "migrate server"
+check_entrypoint "entrypoint: con SEED_ON_START=true, migra, siembra y arranca" true - 0 "migrate seed server"
+check_entrypoint "entrypoint: SEED_ON_START con otro valor no siembra" TRUE - 0 "migrate server"
+check_entrypoint "entrypoint: si la migración falla, no siembra ni arranca" true "migrate deploy" error "migrate"
+check_entrypoint "entrypoint: si el seed falla, no arranca" true "seed/run.mjs" error "migrate seed"
+
+# La etapa tools de la imagen elimina Next.js: el seed y lo que importa no pueden depender de él.
+seed_next_imports="$(grep -rlE "from ['\"](next|next/[^'\"]*)['\"]" "$ROOT/apps/web/prisma/seed" \
+  "$ROOT/apps/web/src/infrastructure/db" "$ROOT/apps/web/src/infrastructure/auth/argon2-hasher.ts" \
+  "$ROOT/apps/web/src/lib/env.ts" 2>/dev/null)"
+if [ -z "$seed_next_imports" ]; then
+  report ok "seed: ni el seed ni sus dependencias de src importan Next.js (no está en la etapa tools)"
+else
+  report fail "seed: ni el seed ni sus dependencias de src importan Next.js (no está en la etapa tools)" "$seed_next_imports"
+fi
+
 echo "compose.test: $passed ok, $failed fallo(s)."
 [ "$failed" -eq 0 ]

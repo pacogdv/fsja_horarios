@@ -30,8 +30,9 @@ Las reglas permanentes del proyecto están en [`CLAUDE.md`](CLAUDE.md) y las dec
 | `pnpm check` | Lint y tipos de web y solver, más los tests de [`scripts/tests/`](scripts/tests/) (ADR, raíz del monorepo y Docker Compose) |
 | `pnpm lint` / `pnpm typecheck` | Solo lint o solo tipos |
 | `pnpm test` | Tests unitarios de web (con cobertura: `src/domain` y `src/application` ≥ 90 %) y solver |
+| `pnpm --filter web run db:seed` | Seed de usuarios de demo (requiere `APP_ENV` development o test, `DATABASE_URL` y las variables `SEED_*` en el entorno; ver abajo) |
 | `pnpm --filter web run test:integration` | Tests de integración de la web contra PostgreSQL. Requieren `docker compose up -d db` y `TEST_DATABASE_URL` en `.env` (la BD `fsja_test` se borra y recrea en cada ejecución) |
-| `pnpm --filter web run test:coverage:full` | Tests unitarios y de integración de la web con cobertura (≥ 90 % en `src/domain` y `src/infrastructure`). Mismos requisitos que el anterior |
+| `pnpm --filter web run test:coverage:full` | Tests unitarios y de integración de la web con cobertura (≥ 90 % en `src/domain`, `src/application`, `src/infrastructure` y `prisma/seed`). Mismos requisitos que el anterior |
 | `pnpm test:e2e` | Tests E2E (Playwright) |
 | `pnpm dev` | Arranca la web y el solver (en `127.0.0.1:8000`) en modo desarrollo |
 
@@ -56,3 +57,20 @@ docker compose up -d --build --wait
 
 La web queda en <http://localhost:3000>, publicada solo en `127.0.0.1`. El solver y la base de datos no
 publican puertos: solo son accesibles desde la red interna de Docker.
+
+Al arrancar, `web` aplica las migraciones (`prisma migrate deploy`). Si fallan, no arranca.
+
+### Usuarios de demostración
+
+Con `SEED_ON_START=true` en `.env` (y `APP_ENV=development`), `web` crea al arrancar un usuario por rol. Las
+credenciales son las de las variables `SEED_*`: los correos tienen valores de ejemplo en `.env.example`, y las
+contraseñas las eliges tú (al menos 12 caracteres).
+
+| Rol | Correo (por defecto) | Contraseña |
+|-----|----------------------|------------|
+| `ADMIN_DIRECCION` | `admin@demo.local` | `SEED_ADMIN_PASSWORD` |
+| `DOCENTE` | `docente@demo.local` | `SEED_TEACHER_PASSWORD` |
+| `INVITADO_DEMO` | `invitado@demo.local` | `SEED_GUEST_PASSWORD` |
+
+El seed nunca se ejecuta con `APP_ENV=production` (TFM-02). Es idempotente: arrancar de nuevo no duplica
+usuarios y restaura los de demo si se han modificado.

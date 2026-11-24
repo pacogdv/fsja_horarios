@@ -9,7 +9,8 @@ import { z } from "zod";
 
 const APP_ENVS = ["development", "test", "production"] as const;
 const SECRET_MIN_LENGTH = 32;
-const SEED_PASSWORD_MIN_LENGTH = 12;
+/** Mínimo de las contraseñas `SEED_*`; lo comparte el seed (prisma/seed/users.ts). */
+export const SEED_PASSWORD_MIN_LENGTH = 12;
 
 /** Una variable vacía (`VAR=`) cuenta como ausente. */
 const emptyAsMissing = <T extends z.ZodType>(schema: T) =>

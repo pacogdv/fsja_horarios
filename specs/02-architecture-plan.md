@@ -233,6 +233,20 @@ services/solver/
 | `solver` | build `services/solver` | `solver_net` (internal) | **Ninguno** | `read_only: true`, `tmpfs /tmp`, límites de CPU y memoria, usuario no root |
 | `web` | build `apps/web` | `backend`, `solver_net`, `public` | `3000`, solo en `127.0.0.1` (en local va por HTTP; en producción la expone el proxy inverso del H6) | Ejecuta `prisma migrate deploy` al arrancar; seed opcional con `SEED_ON_START=true` (nunca en producción) |
 
+- **Arranque de `web`** (`apps/web/docker-entrypoint.sh`, T1.16):
+  1. `prisma migrate deploy`. Si falla, el contenedor termina sin arrancar el servidor.
+  2. Con `SEED_ON_START=true` (exactamente), el seed de usuarios (`prisma/seed/run.mjs`). Si falla, tampoco
+     arranca.
+  3. El servidor (`exec`, que pasa a ser el PID 1).
+
+  La imagen incluye, aparte del servidor standalone, una instalación de producción con el CLI de Prisma, las
+  migraciones y el seed (`/app/tools`).
+- **Seed** (TFM-01, TFM-02):
+  - Solo se ejecuta con `APP_ENV` igual a `development` o `test` (denegación por defecto). La comprobación se
+    hace antes de conectarse a la BD.
+  - Las credenciales llegan de las variables `SEED_*`.
+  - Es idempotente: crea los usuarios que faltan y restaura los de demo modificados (rol, estado, bloqueo y
+    contraseña), sin tocar ningún otro usuario.
 - `solver_net` y `backend` se declaran con `internal: true`: no tienen salida a Internet.
 - El solver **no comparte red con `db`**, así que no puede llegar a la base de datos.
 

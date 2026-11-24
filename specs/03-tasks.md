@@ -35,7 +35,7 @@ Los crea T1.2, T1.3 y T1.5. Cada tarea cita el suyo.
 | Puerta global | `pnpm check` | Lint + tipos de web (`eslint`, `tsc --noEmit`) y del solver (`ruff check`, `ruff format --check`, `mypy --strict`), más los tests de `scripts/tests/` (los de Docker Compose, solo si hay CLI de Docker) |
 | Web unit | `pnpm --filter web exec vitest run --project unit <ruta>` | — |
 | Web cobertura | `pnpm --filter web run test:coverage` (lo ejecuta `pnpm test`) | Umbral ≥ 90 % en `src/domain/**` y `src/application/**` (líneas, ramas, funciones y sentencias); la infraestructura se cubre con tests de integración |
-| Web cobertura completa | `pnpm --filter web run test:coverage:full` | Unit + integración (requiere `docker compose up -d db`); umbral ≥ 90 % también en `src/infrastructure/**`. Lo ejecuta CI (T1.18) |
+| Web cobertura completa | `pnpm --filter web run test:coverage:full` | Unit + integración (requiere `docker compose up -d db`); umbral ≥ 90 % también en `src/infrastructure/**` y `prisma/seed/**`. Lo ejecuta CI (T1.18) |
 | Web integración | `pnpm --filter web exec vitest run --project integration <ruta>` | `docker compose up -d db` (BD `fsja_test`, reiniciada por la configuración global de Vitest) |
 | Web E2E | `pnpm --filter web exec playwright test <spec>` | `docker compose up -d --wait` |
 | Solver | `uv run --directory services/solver pytest <ruta>` | — |
@@ -73,7 +73,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - [x] T1.13 Guardas de servidor y CSRF
 - [x] T1.14 Middleware y cabeceras de seguridad
 - [x] T1.15 Tokens de diseño, layout y login
-- [ ] T1.16 Seed mínimo de usuarios
+- [x] T1.16 Seed mínimo de usuarios
 - [ ] T1.17 E2E de autenticación y RBAC
 - [ ] T1.18 Integración continua
 
@@ -402,8 +402,34 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
   - En Docker, `web` aplica `prisma migrate deploy` al arrancar y, con `SEED_ON_START=true`, el seed
     (02 §1.4). Lo hace el propio servicio `web` (CLAUDE.md §1.5 fija tres servicios) y, si la migración
     falla, no arranca. `compose-smoke.sh` comprueba que existen las tablas de T1.7.
+- **Implementación:**
+  - `prisma/seed/run.mjs` lanza el seed en TypeScript con jiti (`pnpm --filter web run db:seed`).
+  - `apps/web/docker-entrypoint.sh` hace las migraciones, luego el seed si `SEED_ON_START=true` y después el
+    servidor.
+  - La etapa `tools` de la imagen contiene el CLI de Prisma, las migraciones y el seed, con dependencias de
+    producción y sin Next.js.
+  - `prisma` pasa a ser dependencia de producción y se añade `jiti` (ADR-0010).
+- **Decisiones:**
+  - La guarda es de denegación por defecto: solo se admite `APP_ENV` igual a `development` o `test`.
+  - El seed restaura los usuarios de demo modificados (rol, estado, bloqueo, nombre y contraseña), para que las
+    credenciales documentadas funcionen siempre. No toca ningún otro usuario.
+- **Verificado en Docker:**
+  - El arranque aplica `0001_init` y `compose-smoke.sh` da 7/7.
+  - Con `SEED_ON_START=true`: primera vez, «3 creados»; segunda vez, «3 sin cambios».
+  - Con `APP_ENV=production`, el seed se niega y el contenedor sale con 1.
+  - Con credenciales de BD incorrectas, la migración falla (P1000) y el servidor no arranca.
+- **Pendiente:** el vínculo del usuario `DOCENTE` con un profesor con horario (TFM-01) llega con el centro de
+  demostración (`prisma/seed/demo-school/`, H5).
+- **Revisión de seguridad:**
+  - `prisma/seed/**` entra en la cobertura con umbral ≥ 90 % (`--mode full`). `runSeed` se prueba en proceso:
+    URL de BD no válida y error de conexión sin la contraseña de `DATABASE_URL`.
+  - Los tests del CLI tienen un timeout explícito (30 s): con el de 5 s por defecto, un proceso que seguía vivo
+    ensuciaba el test siguiente.
 - **Refs:** [TFM-01], [TFM-02], [02 §1.4]
-- **Test:** `pnpm --filter web exec vitest run --project integration prisma/seed`
+- **Test:**
+  - `pnpm --filter web exec vitest run --project integration prisma/seed`
+  - `scripts/tests/compose.test.sh` (entrypoint)
+  - `scripts/compose-smoke.sh`
 
 #### T1.17 — E2E de autenticación y RBAC
 - **Archivos:** `apps/web/playwright.config.ts`, `apps/web/e2e/{auth.spec.ts, rbac.spec.ts, fixtures/users.ts}`.
@@ -425,7 +451,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - **Archivos:** `.github/workflows/ci.yml`.
 - **Criterios de aceptación:**
   - Trabajos: `check` (incluye los tests de `scripts/tests/`), `web-unit`, `web-integration` (servicio postgres:16,
-    con `test:coverage:full`: umbral ≥ 90 % en `src/domain` y `src/infrastructure`), `solver-tests` (con
+    con `test:coverage:full`: umbral ≥ 90 % en `src/domain`, `src/application`, `src/infrastructure` y `prisma/seed`), `solver-tests` (con
     cobertura), `docker-build`, `e2e` (compose completo y artefacto del informe de Playwright).
   - Usa caché de pnpm y uv.
   - Ejecuta `pnpm check` con `CHECK_REQUIRE_ALL=1`, de modo que un componente ausente hace fallar CI.

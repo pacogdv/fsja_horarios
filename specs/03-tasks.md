@@ -71,7 +71,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - [x] T1.11 Rate limiter en PostgreSQL
 - [x] T1.12 Casos de uso de login y logout
 - [x] T1.13 Guardas de servidor y CSRF
-- [ ] T1.14 Middleware y cabeceras de seguridad
+- [x] T1.14 Middleware y cabeceras de seguridad
 - [ ] T1.15 Tokens de diseño, layout y login
 - [ ] T1.16 Seed mínimo de usuarios
 - [ ] T1.17 E2E de autenticación y RBAC
@@ -341,14 +341,20 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - **Test:** `pnpm --filter web exec vitest run --project unit src/infrastructure test/permission-coverage.test.ts`
 
 #### T1.14 — Middleware y cabeceras de seguridad
-- **Archivos:** `src/middleware.ts`, `src/infrastructure/security/{csp.ts, security-headers.ts, security-headers.test.ts}`.
+- **Archivos:** `src/proxy.ts` (Next.js 16 renombró `middleware.ts` a `proxy.ts`, 02 §5.3),
+  `src/infrastructure/security/{csp.ts, security-headers.ts, login-redirect.ts, security-proxy.ts}` con sus
+  tests, `src/proxy.test.ts`, `src/app/layout.tsx` (`connection()`) y `layout.test.tsx`.
 - **Criterios de aceptación:**
   - Cada respuesta lleva una CSP con un **nonce distinto por petición** y las cabeceras de [02 §5.5].
   - HSTS solo se envía con `APP_ENV=production`.
   - Las rutas de `(app)` sin cookie redirigen a `/login?next=…`. `next` solo acepta rutas relativas, para
     evitar redirecciones abiertas.
+  - Los scripts de Next.js llevan el nonce de la petición: no hay páginas prerenderizadas (02 §5.5).
+    Verificado con `next build` + `next start`: con la página estática, 0 de 9 scripts tenían nonce.
+- **Nota:** `safeNextPath` (en `login-redirect.ts`) es también el filtro que debe aplicar la acción de login
+  (T1.15) antes de redirigir a `next`.
 - **Refs:** [02 §5.3, §5.5]
-- **Test:** `pnpm --filter web exec vitest run --project unit src/infrastructure/security`
+- **Test:** `pnpm --filter web exec vitest run --project unit src/infrastructure/security src/proxy.test.ts src/app/layout.test.tsx`
 
 #### T1.15 — Tokens de diseño, layout y login
 - **Archivos:**
@@ -387,6 +393,9 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
   - `DOCENTE` en `/administracion/usuarios` recibe 403 o la página de acceso denegado.
   - `INVITADO_DEMO` no puede ejecutar una Server Action de escritura (403).
   - Las respuestas incluyen la CSP y `X-Frame-Options: DENY`.
+  - La página hidrata sin violaciones de CSP en la consola del navegador. T1.14 lo verificó solo a nivel de
+    HTML (todos los scripts llevan el nonce de la petición); falta el navegador real, incluido
+    `upgrade-insecure-requests` sobre `http://localhost`.
 - **Refs:** [02 §5], [TFM-03]
 - **Test:** `pnpm --filter web exec playwright test e2e/auth.spec.ts e2e/rbac.spec.ts`
 

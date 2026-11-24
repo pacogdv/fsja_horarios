@@ -47,3 +47,13 @@ El vector principal de XSS es la ejecución de **scripts**, no de estilos.
     puede enviar datos fuera.
 - **Seguimiento:** revisar en cada actualización mayor de Radix y shadcn/ui si admite estilos sin inline.
   T1.14 verifica las cabeceras con tests unitarios y T1.17 con E2E.
+
+## Historial
+
+- **2026-11-24 (T1.14):**
+  - El nonce lo genera `src/proxy.ts`, el nombre que Next.js 16 da al antiguo `middleware.ts`.
+  - Excepción acotada al punto 1: con `next dev` (`NODE_ENV=development`) se añade `'unsafe-eval'` a
+    `script-src`, porque React lo usa en desarrollo para reconstruir trazas de error. Nunca se añade con
+    `next start` ni en la imagen Docker, y un test lo comprueba (`src/proxy.test.ts`).
+  - Para que Next.js aplique el nonce, todas las páginas se renderizan por petición (`connection()` en el
+    layout raíz).

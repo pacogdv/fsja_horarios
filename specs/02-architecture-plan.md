@@ -86,7 +86,7 @@ apps/web/
 │   ├── perspectives.spec.ts     # VIS-02 (< 200 ms)
 │   └── fixtures/
 └── src/
-    ├── middleware.ts            # Cabeceras + CSP nonce + redirección gruesa (sección 5.3)
+    ├── proxy.ts                 # Cabeceras + CSP nonce + redirección gruesa (sección 5.3; el antiguo middleware.ts)
     ├── app/                     # SOLO UI y adaptadores de entrada
     │   ├── layout.tsx
     │   ├── globals.css          # Tokens de diseño (sección 6.2)
@@ -823,10 +823,13 @@ hash, no hace falta un secreto de firma. Esto cumple la sección 3.1 de `CLAUDE.
 
 ### 5.3 Middleware y RBAC en Next.js
 
-**Capa 1: `src/middleware.ts`** (gruesa, sin acceso a BD):
+**Capa 1: `src/proxy.ts`** (gruesa, sin acceso a BD). Next.js 16 renombró `middleware.ts` a `proxy.ts`
+(misma función, runtime Node por defecto); la lógica está en `infrastructure/security/security-proxy.ts`:
 - Genera el **nonce de la CSP** por petición y añade las cabeceras de seguridad (5.5).
-- Si la ruta es de `(app)` y no hay cookie de sesión, redirige a `/login`. **No autoriza**: solo evita
-  pintar pantallas a usuarios anónimos.
+- Si la ruta es de `(app)` y no hay cookie de sesión (o está vacía), redirige a `/login?next=<ruta>`. Son de
+  `(app)` todas salvo `/login`, `/api/*` (sus guardas responden 401) y los recursos de `/_next`. `next` solo
+  admite rutas relativas del propio origen (sin `//`, `\`, caracteres de control ni `/login`); si no, se
+  omite y tras el login se vuelve a `/`. **No autoriza**: solo evita pintar pantallas a usuarios anónimos.
 
 **Capa 2: guardas en servidor** (`infrastructure/auth/guards.ts`), la que **realmente** autoriza:
 - `requireSession()`: carga la sesión por hash del token. Si no existe, está caducada o el usuario está
@@ -879,7 +882,8 @@ hash, no hace falta un secreto de firma. Esto cumple la sección 3.1 de `CLAUDE.
 
 ### 5.5 Cabeceras de seguridad
 
-Las establece `middleware.ts` en todas las respuestas:
+Las establece `proxy.ts` en todas las respuestas, salvo los recursos estáticos de Next.js (`/_next/static`,
+`/_next/image`, `favicon.ico`), que no son documentos y a los que la CSP no se aplica:
 
 ```
 Content-Security-Policy: default-src 'self'; script-src 'self' 'nonce-{N}' 'strict-dynamic';
@@ -897,6 +901,14 @@ Cross-Origin-Opener-Policy: same-origin
 `style-src 'unsafe-inline'` hace falta para los estilos inline de Radix/shadcn, por posicionamiento de
 popovers. Se documenta como riesgo aceptado (ADR), porque el vector principal de XSS (`script-src`) queda
 cerrado con el nonce. Las fuentes se sirven desde la propia app (`next/font/local`), sin CDN.
+
+- El nonce son 128 bits aleatorios en base64, distintos en cada petición. El proxy lo entrega al render
+  (cabeceras `x-nonce` y `Content-Security-Policy` de la petición, sustituyendo las que envíe el cliente) y
+  Next.js lo pone en sus scripts.
+- Next.js solo aplica el nonce en páginas renderizadas por petición, así que el layout raíz llama a
+  `connection()` y no hay páginas prerenderizadas (verificado con `next build` y `next start` en T1.14).
+- Solo con `next dev` (`NODE_ENV=development`) se añade `'unsafe-eval'` a `script-src`: React lo usa para
+  reconstruir trazas de error. Nunca en `next start` ni en la imagen Docker (ADR-0009).
 
 ### 5.6 CSRF y rate limiting
 

@@ -2,6 +2,8 @@
 /**
  * T1.4 — El servidor valida el entorno al arrancar y no arranca si es inválido (02 §5.4).
  */
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resetEnvForTests } from "@/lib/env";
 import { register } from "./instrumentation";
@@ -61,5 +63,13 @@ describe("T1.4 instrumentation.register", () => {
   it("en el runtime edge no valida (no tiene acceso a los secretos del servidor)", async () => {
     stubEnv({ NEXT_RUNTIME: "edge" });
     await expect(register()).resolves.toBeUndefined();
+  });
+
+  it("instrumentation.ts no usa APIs exclusivas de Node: se compila también para edge (aviso de next build)", () => {
+    // El código de Node vive en instrumentation-node.ts y se importa solo dentro de la rama `nodejs`.
+    const source = readFileSync(fileURLToPath(new URL("./instrumentation.ts", import.meta.url)), "utf8");
+    expect(source).not.toMatch(/process\.exit/);
+    expect(source).toMatch(/process\.env\.NEXT_RUNTIME === "nodejs"/);
+    expect(source).toMatch(/await import\("\.\/instrumentation-node"\)/);
   });
 });

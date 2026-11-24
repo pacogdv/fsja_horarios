@@ -65,7 +65,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - [x] T1.6 Dockerfiles y Docker Compose
 - [x] T1.7 Prisma: identidad y curso
 - [x] T1.8 Política de acceso (RBAC)
-- [ ] T1.9 Hash de contraseñas Argon2id
+- [x] T1.9 Hash de contraseñas Argon2id
 - [ ] T1.10 Almacén de sesiones
 - [ ] T1.11 Rate limiter en PostgreSQL
 - [ ] T1.12 Casos de uso de login y logout
@@ -359,7 +359,10 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
   - Con `APP_ENV=production`, el seed termina con un código distinto de 0 sin tocar la BD.
   - Crea los 3 usuarios con las credenciales de las variables `SEED_*`.
   - Es idempotente: ejecutarlo dos veces no duplica nada.
-- **Refs:** [TFM-01], [TFM-02]
+  - En Docker, `web` aplica `prisma migrate deploy` al arrancar y, con `SEED_ON_START=true`, el seed
+    (02 §1.4). Lo hace el propio servicio `web` (CLAUDE.md §1.5 fija tres servicios) y, si la migración
+    falla, no arranca. `compose-smoke.sh` comprueba que existen las tablas de T1.7.
+- **Refs:** [TFM-01], [TFM-02], [02 §1.4]
 - **Test:** `pnpm --filter web exec vitest run --project integration prisma/seed`
 
 #### T1.17 — E2E de autenticación y RBAC
@@ -746,6 +749,8 @@ integración contra PostgreSQL.
   `src/app/(app)/configuracion/curso/`, selector de curso en `topbar.tsx`.
 - **Criterios de aceptación:**
   - CRUD de cursos académicos, con uno solo marcado como actual.
+  - Hay un único centro por instalación (P-01): la BD impide crear una segunda fila en `school` (test de
+    integración), además de la comprobación del caso de uso.
   - Los niveles se crean por etapa (las 4 etapas disponibles).
   - Cambiar de curso en la barra superior cambia el contexto de todas las páginas.
 - **Refs:** [RG-03], [01 §2]
@@ -1281,6 +1286,8 @@ completa: documentación, trazabilidad y guion de defensa.
     HSTS activo, `restart: unless-stopped` y límites de recursos en los tres servicios.
   - Imagen web menor de 250 MB y del solver menor de 400 MB; las dos sin herramientas de compilación.
   - El smoke test pasa con el override.
+  - La web se conecta a PostgreSQL con un rol sin privilegios de superusuario (solo sobre el esquema de la
+    aplicación); `POSTGRES_USER` queda para la administración y las migraciones.
 - **Refs:** [02 §1.4, §5.7], [TFM-02]
 - **Test:** `docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait && ./scripts/compose-smoke.sh --prod`
 

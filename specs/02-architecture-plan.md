@@ -861,7 +861,11 @@ hash, no hace falta un secreto de firma. Esto cumple la sección 3.1 de `CLAUDE.
 - **Propiedad**: los permisos `:own` exigen `resource.teacherId === session.user.teacherId`. Para P-04,
   también se aceptan los grupos a los que da clase ese profesor en el horario vigente.
 - **Test de cobertura**: un test recorre todos los `actions.ts` y `route.ts` y falla si alguna
-  exportación no está envuelta en `withPermission`.
+  exportación no está envuelta en `withPermission`. La lista blanca explícita solo tiene dos entradas:
+  - el login (`(public)/login/actions.ts#login`), que por definición se usa sin sesión;
+  - el logout (`api/auth/logout/route.ts#POST`): no hay ningún permiso común a los tres roles, sin sesión
+    no hace nada y solo actúa sobre la cookie de quien lo llama. Aun así, rechaza las peticiones de otro
+    origen (`origin-check`, CSRF) y responde `303` a `/login` borrando la cookie.
 - **INVITADO_DEMO**: ninguna escritura. La UI oculta los controles de escritura, y el servidor responde
   `403` con un mensaje explicativo (TFM-03).
 - El sidebar se filtra por permisos, pero esto es solo **presentación**.
@@ -949,7 +953,10 @@ con la misma IP pública (NAT): contando también los logins correctos, el 21.º
 8:00 y las 8:15 quedaría bloqueado. El límite se consulta sin contar antes de verificar y se incrementa solo
 cuando el login falla; frena igual la fuerza bruta desde una IP.
 
-Al superar el límite se responde `429` con `Retry-After`. Se usa PostgreSQL en lugar de Redis porque hay
+Al superar el límite, un Route Handler responde `429` con `Retry-After`. Una Server Action (el login, 5.2) no
+puede fijar el código HTTP, así que devuelve el resultado tipado `RATE_LIMITED` con `retryAfterSeconds` y la UI
+muestra cuánto esperar («Demasiados intentos. Espera N minutos…»). En ambos casos no se hace ningún trabajo
+más. Se usa PostgreSQL en lugar de Redis porque hay
 una sola instancia de web. Si se escala horizontalmente, se cambia el adaptador `RateLimiter` sin tocar
 los casos de uso.
 
@@ -1013,13 +1020,21 @@ los casos de uso.
 | `--primary-foreground` | `#FFFFFF` | `#0E1A2B` | Texto sobre `primary` |
 | `--accent` | `#B08D57` (latón) | `#C9A971` | Detalles puntuales (logo, vigente) |
 | `--success` | `#2F6B4F` | `#6FBF94` | Celda válida, OK |
-| `--warning` | `#9A6A12` | `#E0B252` | Advertencias, huecos |
+| `--warning` | `#8A5F10` | `#E0B252` | Advertencias, huecos |
 | `--danger` | `#A23B3B` | `#E58A8A` | Conflictos duros, errores |
 | `--info` | `#2D5D7B` | `#7DB3D6` | Información, prefijadas |
 | `--ring` | `#1F3A5F` | `#8FB1DB` | Anillo de foco (2 px + offset) |
 
+- **Contraste**:
+  - Los tokens de texto deben tener un contraste ≥ 4.5:1 sobre `background`, `surface` y `surface-muted`,
+    en ambos modos (T1.15 lo calcula). Son `foreground`, `muted-foreground`, `primary`, `success`, `warning`,
+    `danger` e `info`; además, `primary-foreground` sobre `primary`.
+  - En T1.15, `--warning` claro pasó de `#9A6A12` (4,04 sobre `surface-muted`) a `#8A5F10`.
+  - `--accent` es decorativo (logo y detalles) y no se usa para texto: en claro tiene 2,9:1.
 - **Modo oscuro**: se activa con `prefers-color-scheme` y se puede forzar con un conmutador
-  (`data-theme`). La preferencia se guarda en cookie para evitar parpadeo en el SSR.
+  (`data-theme`). La preferencia (`light`, `dark` o `system`) se guarda en la cookie `fsja_theme`. Esa cookie
+  no es sensible: no es `HttpOnly`, porque el conmutador la escribe en el navegador. Como el SSR pinta
+  `data-theme` en `<html>`, no hay parpadeo.
 - **Paleta de materias**: 16 tonos de baja saturación, cada uno con variante `bg` (tinte al 14 % en
   claro y al 22 % en oscuro) y `fg`/borde. Se validan para un contraste de texto ≥ 4.5:1 en ambos modos.
   Al crear una materia se asigna automáticamente el tono menos usado de su departamento.

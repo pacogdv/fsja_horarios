@@ -1,3 +1,120 @@
 @import "tailwindcss";
 
-/* Los tokens de diseño (claro/oscuro) se definen en T1.15 (specs/02-architecture-plan.md §6.2). */
+/*
+ * Tokens de diseño (specs/02-architecture-plan.md §6.2). El test src/app/globals.test.ts comprueba que coinciden
+ * con la spec y que los de texto tienen contraste ≥ 4.5:1 sobre los fondos, en ambos modos.
+ *
+ * Modo oscuro: se activa con prefers-color-scheme salvo que se fuerce el claro, o con data-theme="dark". El
+ * servidor pinta data-theme a partir de la cookie fsja_theme, así que no hay parpadeo. Los dos bloques oscuros
+ * deben ser idénticos (lo comprueba el test).
+ */
+:root {
+  color-scheme: light;
+  --background: #f7f6f3;
+  --surface: #ffffff;
+  --surface-muted: #efede8;
+  --border: #dedad2;
+  --foreground: #1c1e21;
+  --muted-foreground: #5f646b;
+  --primary: #1f3a5f;
+  --primary-foreground: #ffffff;
+  --accent: #b08d57;
+  --success: #2f6b4f;
+  --warning: #8a5f10;
+  --danger: #a23b3b;
+  --info: #2d5d7b;
+  --ring: #1f3a5f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --background: #111315;
+    --surface: #181b1f;
+    --surface-muted: #1f2328;
+    --border: #2c3137;
+    --foreground: #e8e6e1;
+    --muted-foreground: #9ba1a8;
+    --primary: #8fb1db;
+    --primary-foreground: #0e1a2b;
+    --accent: #c9a971;
+    --success: #6fbf94;
+    --warning: #e0b252;
+    --danger: #e58a8a;
+    --info: #7db3d6;
+    --ring: #8fb1db;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #111315;
+  --surface: #181b1f;
+  --surface-muted: #1f2328;
+  --border: #2c3137;
+  --foreground: #e8e6e1;
+  --muted-foreground: #9ba1a8;
+  --primary: #8fb1db;
+  --primary-foreground: #0e1a2b;
+  --accent: #c9a971;
+  --success: #6fbf94;
+  --warning: #e0b252;
+  --danger: #e58a8a;
+  --info: #7db3d6;
+  --ring: #8fb1db;
+}
+
+/* Utilidades de Tailwind (bg-surface, text-muted-foreground…) y alias que esperan los componentes de shadcn/ui. */
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
+  --color-ring: var(--ring);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--foreground);
+  --color-muted: var(--surface-muted);
+  --color-input: var(--border);
+  --color-destructive: var(--danger);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+
+  /* Foco siempre visible: anillo de 2 px con separación (02 §6.2 y §6.7). */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

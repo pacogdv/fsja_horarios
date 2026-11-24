@@ -5,7 +5,8 @@
  *
  * Recorre todos los `actions.ts` (Server Actions) y `route.ts` (Route Handlers) de `src/app` y falla si
  * alguna exportación no está envuelta en `withPermission(...)` o `withPermission.route(...)`. La única
- * excepción es el login, en una lista blanca explícita: por definición, se usa sin sesión.
+ * excepción son el login y el logout, en una lista blanca explícita (02 §5.3): el login se usa sin sesión, y no
+ * hay ningún permiso común a los tres roles para el logout, que sin sesión no hace nada y comprueba el origen.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -16,8 +17,8 @@ import { describe, expect, it } from "vitest";
 const appDir = fileURLToPath(new URL("../src/app", import.meta.url));
 const HANDLER_FILES = new Set(["actions.ts", "route.ts"]);
 
-/** `archivo relativo a src/app#exportación` que se ejecutan sin sesión. Solo el login. */
-const PUBLIC_EXPORTS: ReadonlySet<string> = new Set(["(public)/login/actions.ts#login"]);
+/** `archivo relativo a src/app#exportación` que se ejecutan sin permiso. Solo el login y el logout. */
+const PUBLIC_EXPORTS: ReadonlySet<string> = new Set(["(public)/login/actions.ts#login", "api/auth/logout/route.ts#POST"]);
 
 /** Exportaciones de configuración de rutas de Next.js: no son puntos de entrada. */
 const ROUTE_SEGMENT_CONFIG = new Set(["dynamic", "dynamicParams", "revalidate", "fetchCache", "runtime", "preferredRegion", "maxDuration"]);
@@ -112,6 +113,13 @@ describe("T1.13 analizador de exportaciones", () => {
     const source = `export async function login() {} export async function resetPassword() {}`;
     expect(unguardedExports(source, login)).toEqual([`${login}#resetPassword`]);
     expect(unguardedExports(`export async function login() {}`, actions)).toEqual([`${actions}#login`]);
+  });
+
+  it("la lista blanca solo cubre el POST de logout (T1.15), no otros métodos ni otras rutas", () => {
+    const logout = "api/auth/logout/route.ts";
+    const source = `export const POST = logoutRoute; export const GET = logoutRoute;`;
+    expect(unguardedExports(source, logout)).toEqual([`${logout}#GET`]);
+    expect(unguardedExports(`export const POST = logoutRoute;`, route)).toEqual([`${route}#POST`]);
   });
 });
 

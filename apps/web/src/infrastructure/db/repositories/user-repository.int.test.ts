@@ -65,9 +65,10 @@ describe("T1.12 PrismaUserRepository", () => {
     expect(await stored()).toMatchObject({ failedLoginCount: 0, lockedUntil: null, lastLoginAt: at });
   });
 
-  it("findPrincipal devuelve rol y estado; sin docente ni grupos hasta T3.8 y el horario vigente (H5)", async () => {
+  it("findPrincipal devuelve rol, estado y nombre visible; sin docente ni grupos hasta T3.8 y el horario vigente (H5)", async () => {
     expect(await repository.findPrincipal(userId)).toEqual({
       role: "ADMIN_DIRECCION",
+      displayName: "Ana",
       isActive: true,
       teacherId: null,
       taughtClassGroupIds: new Set(),

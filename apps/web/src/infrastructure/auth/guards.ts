@@ -38,6 +38,7 @@ export interface AuthenticatedSession {
   readonly sessionId: string;
   readonly userId: string;
   readonly role: Role;
+  readonly displayName: string;
   readonly actor: Actor;
 }
 
@@ -95,6 +96,7 @@ export function makeGuards(deps: GuardDependencies) {
       sessionId: session.id,
       userId: session.userId,
       role: principal.role,
+      displayName: principal.displayName,
       actor: {
         role: principal.role,
         teacherId: principal.teacherId,

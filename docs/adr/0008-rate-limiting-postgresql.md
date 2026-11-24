@@ -68,3 +68,6 @@ reinicios de la web y ser atómicos ante peticiones concurrentes.
   (`RateLimiter.peek` antes de verificar y `consume` al fallar). Contando también los correctos, un centro
   con todo el profesorado tras la misma IP pública (NAT) bloquearía el login al 21.º docente en 15 min. El
   límite por (ip, correo) sigue contando todos los intentos.
+- **2026-11-24 (revisión de T1.15):** el punto 5 (`429` con `Retry-After`) aplica a los Route Handlers. El
+  login es una Server Action (spec 02 §5.2), que no puede fijar el código HTTP: devuelve `RATE_LIMITED` con
+  `retryAfterSeconds` y el formulario muestra cuánto esperar (spec 02 §5.6; T1.17 ajustado).

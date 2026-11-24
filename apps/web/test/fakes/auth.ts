@@ -39,6 +39,7 @@ export class FakePasswordHasher implements PasswordHasher {
 /** Copia mutable del usuario: los tests cambian su estado directamente. */
 type StoredUser = { -readonly [Field in keyof UserCredentials]: UserCredentials[Field] } & {
   email: string;
+  displayName: string;
   lastLoginAt: Date | null;
   teacherId: string | null;
   taughtClassGroupIds: string[];
@@ -55,6 +56,7 @@ export class FakeUserRepository implements UserRepository {
       failedLoginCount: 0,
       lockedUntil: null,
       lastLoginAt: null,
+      displayName: user.email,
       teacherId: null,
       taughtClassGroupIds: [],
       ...user,
@@ -82,6 +84,7 @@ export class FakeUserRepository implements UserRepository {
     return {
       role: user.role,
       isActive: user.isActive,
+      displayName: user.displayName,
       teacherId: user.teacherId,
       taughtClassGroupIds: new Set(user.taughtClassGroupIds),
     };

@@ -37,10 +37,15 @@ beforeEach(() => {
 });
 
 describe("T1.13 requireSession [02 §5.3]", () => {
-  it("devuelve la sesión con el usuario y su rol", async () => {
-    cookieToken = signIn("u-admin", "ADMIN_DIRECCION");
+  it("devuelve la sesión con el usuario, su rol y su nombre visible (T1.15: barra superior)", async () => {
+    cookieToken = signIn("u-admin", "ADMIN_DIRECCION", { displayName: "Ana Directora" });
     const session = await guards.requireSession();
-    expect(session).toMatchObject({ sessionId: "seeded-token-u-admin", userId: "u-admin", role: "ADMIN_DIRECCION" });
+    expect(session).toMatchObject({
+      sessionId: "seeded-token-u-admin",
+      userId: "u-admin",
+      role: "ADMIN_DIRECCION",
+      displayName: "Ana Directora",
+    });
     expect(session.actor).toMatchObject({ role: "ADMIN_DIRECCION", teacherId: null });
   });
 

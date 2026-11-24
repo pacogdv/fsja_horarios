@@ -32,6 +32,7 @@ export default defineConfig(({ mode }) => ({
         test: {
           name: "unit",
           environment: "jsdom",
+          setupFiles: ["test/setup-dom.ts"],
           include: ["src/**/*.test.{ts,tsx}", "test/**/*.test.{ts,tsx}"],
           exclude: ["**/*.int.test.{ts,tsx}", "test/lint-fixtures/**", "e2e/**", "node_modules/**"],
         },

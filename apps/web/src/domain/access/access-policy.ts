@@ -96,3 +96,11 @@ export function isAllowed(actor: Actor, permission: Permission, resource?: Acces
   const grant = ACCESS_MATRIX.get(permission)?.get(actor.role as Role);
   return grant !== undefined && isGrantMet(grant, actor, resource);
 }
+
+/**
+ * ¿Tiene el rol `permission` sobre algún recurso? Los permisos «sobre lo propio» cuentan como concedidos.
+ * Solo sirve para presentación (filtrar el sidebar, 02 §6.3): para autorizar se usa siempre `isAllowed`.
+ */
+export function roleHasPermission(role: string, permission: Permission): boolean {
+  return ACCESS_MATRIX.get(permission)?.has(role as Role) ?? false;
+}

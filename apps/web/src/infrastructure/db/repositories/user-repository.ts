@@ -17,7 +17,10 @@ export class PrismaUserRepository implements UserRepository {
   constructor(private readonly db: DatabaseClient) {}
 
   async findPrincipal(userId: string): Promise<Principal | null> {
-    const user = await this.db.appUser.findUnique({ where: { id: userId }, select: { role: true, isActive: true } });
+    const user = await this.db.appUser.findUnique({
+      where: { id: userId },
+      select: { role: true, isActive: true, displayName: true },
+    });
     if (user === null) return null;
     // El vínculo con el docente (`teacher.user_id`) llega en T3.8 y los grupos impartidos (P-04) con el
     // horario vigente (H5). Hasta entonces, ningún usuario tiene recursos "propios".

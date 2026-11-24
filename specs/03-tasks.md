@@ -72,7 +72,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - [x] T1.12 Casos de uso de login y logout
 - [x] T1.13 Guardas de servidor y CSRF
 - [x] T1.14 Middleware y cabeceras de seguridad
-- [ ] T1.15 Tokens de diseño, layout y login
+- [x] T1.15 Tokens de diseño, layout y login
 - [ ] T1.16 Seed mínimo de usuarios
 - [ ] T1.17 E2E de autenticación y RBAC
 - [ ] T1.18 Integración continua
@@ -336,7 +336,8 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
     (`SessionStore.findValid`) o el usuario está inactivo (`is_active = false`), como en 02 §5.3.
   - `origin-check` rechaza las mutaciones con `Origin` ausente o distinto de `APP_ORIGIN`.
   - `permission-coverage.test.ts` analiza todos los `actions.ts` y `route.ts` y falla si alguna
-    exportación no está envuelta en `withPermission`. Hay una lista blanca explícita solo para login.
+    exportación no está envuelta en `withPermission`. Hay una lista blanca explícita solo para login (T1.15
+    añade el `POST` de logout, ver 02 §5.3).
 - **Refs:** [02 §5.3, §5.6]
 - **Test:** `pnpm --filter web exec vitest run --project unit src/infrastructure test/permission-coverage.test.ts`
 
@@ -369,8 +370,28 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
   - El formulario de login muestra errores de validación accesibles (`aria-describedby`).
   - Los tokens de texto sobre fondo cumplen contraste ≥ 4.5:1. El test calcula el contraste de los pares
     de tokens.
+- **Implementación:**
+  - Navegación: `src/ui/layout/navigation.ts`, con `roleHasPermission` de `domain/access`. Las entradas
+    «mi …» se ocultan a quien tiene el permiso general.
+  - Login: formulario `src/ui/forms/login-form.tsx` y DTO `src/application/auth/login-form.ts`.
+  - Adaptadores `src/infrastructure/auth/{login-action.ts, logout-route.ts}`, conectados en `src/lib/container.ts`.
+  - Textos en `src/lib/i18n/es.ts` (02 §6.7).
+  - Componentes shadcn/ui `button`, `input` y `label` en `src/ui/components/ui/`.
+  - `Principal` y la sesión incluyen `displayName` para la barra superior.
+- **Decisiones:**
+  - `--warning` claro pasa a `#8A5F10` (02 §6.2), porque el valor original no llegaba a 4.5:1.
+  - El logout entra en la lista blanca de 02 §5.3, con comprobación de origen.
+  - Dependencias registradas en ADR-0010.
+- **Verificado con `next build` + `next start`** (revisión de seguridad):
+  - Flujo completo sin JavaScript: login, layout, logout y token revocado.
+  - Un login desde otro origen lo rechaza Next.js (comprueba que `Origin` coincide con `X-Forwarded-Host`
+    o `Host`): `500` con cuerpo genérico y sin cookie.
+  - Las páginas autenticadas y el login responden `no-store`.
+  - Ni el HTML ni el payload RSC contienen el id del usuario, el correo, el hash ni el token.
+- **Pendiente (sin tarea asignada):** sidebar plegable a 72 px y *sheet* en móvil; paleta de comandos ⌘K;
+  Editor y Versiones en el sidebar (necesitan el horario vigente, H4). El selector de curso es de T2.x.
 - **Refs:** [02 §6.2, §6.3], [TFM-03]
-- **Test:** `pnpm --filter web exec vitest run --project unit src/ui/layout src/app`
+- **Test:** `pnpm --filter web exec vitest run --project unit src/ui src/app src/application/auth src/infrastructure/auth test/permission-coverage.test.ts`
 
 #### T1.16 — Seed mínimo de usuarios
 - **Archivos:** `apps/web/prisma/seed/{index.ts, production-guard.ts, users.ts}`, `seed.int.test.ts`.
@@ -388,7 +409,8 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - **Archivos:** `apps/web/playwright.config.ts`, `apps/web/e2e/{auth.spec.ts, rbac.spec.ts, fixtures/users.ts}`.
 - **Criterios de aceptación:**
   - Login correcto redirige a `/`. Un login incorrecto muestra el mensaje genérico.
-  - El 6.º intento en 15 min devuelve 429.
+  - El 6.º intento en 15 min se rechaza con el mensaje «Demasiados intentos…», sin crear sesión aunque la
+    contraseña sea correcta. Es una Server Action: no devuelve 429 (02 §5.6).
   - Tras el logout, volver a `/` redirige a `/login`.
   - `DOCENTE` en `/administracion/usuarios` recibe 403 o la página de acceso denegado.
   - `INVITADO_DEMO` no puede ejecutar una Server Action de escritura (403).

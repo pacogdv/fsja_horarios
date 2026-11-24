@@ -6,7 +6,7 @@
  * cambia un permiso en el código sin cambiar la spec, este test falla.
  */
 import { describe, expect, it } from "vitest";
-import { type AccessResource, type Actor, isAllowed } from "./access-policy";
+import { type AccessResource, type Actor, isAllowed, roleHasPermission } from "./access-policy";
 import { isPermission, type Permission, PERMISSIONS } from "./permission";
 import { isRole, type Role, ROLES } from "./role";
 
@@ -164,5 +164,23 @@ describe("T1.8 denegación por defecto [CLAUDE.md §3.2]", () => {
   it("un recurso de tipo desconocido no concede permisos de propiedad", () => {
     const unknown = { kind: "room", teacherId: OWN_TEACHER } as unknown as AccessResource;
     expect(isAllowed(actor("DOCENTE"), "timetable:read:own", unknown)).toBe(false);
+  });
+});
+
+describe("T1.15 roleHasPermission: ¿puede el rol ejercer el permiso sobre algún recurso? [02 §6.3]", () => {
+  const cases = ROLES.flatMap((role) =>
+    PERMISSIONS.map((permission) => [role, permission, SPEC_MATRIX[permission][role] !== false] as const),
+  );
+
+  it.each(cases)("%s / %s → %s (la propiedad cuenta como concedido: el sidebar no tiene recurso)", (role, permission, expected) => {
+    expect(roleHasPermission(role, permission)).toBe(expected);
+  });
+
+  it.each(["", "SUPERUSER", "toString", "__proto__"])("un rol desconocido (%j) no tiene ningún permiso", (role) => {
+    for (const permission of PERMISSIONS) expect(roleHasPermission(role, permission)).toBe(false);
+  });
+
+  it("un permiso desconocido se deniega", () => {
+    expect(roleHasPermission("ADMIN_DIRECCION", "config:delete" as Permission)).toBe(false);
   });
 });

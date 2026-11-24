@@ -51,6 +51,10 @@ Criterios de admisión de una dependencia:
 | Tailwind CSS | web | MIT | Estilos con tokens de diseño | Impuesto por `CLAUDE.md` §1.2 |
 | shadcn/ui | web | MIT | Componentes accesibles copiados al repo (Radix UI) | Impuesto por `CLAUDE.md` §1.2 |
 | Radix UI | web | MIT | Primitivas accesibles (dependencia de shadcn/ui) | — |
+| clsx | web | MIT | Composición de clases en `cn()` (utilidad estándar de shadcn/ui) | Concatenar cadenas a mano: no resuelve condicionales |
+| tailwind-merge | web | MIT | Resuelve conflictos de clases Tailwind en `cn()` (utilidad estándar de shadcn/ui) | — |
+| class-variance-authority | web | Apache-2.0 | Variantes de los componentes de shadcn/ui (`Button`) | Mapas de clases a mano: lo que shadcn/ui ya resuelve con esta librería |
+| @fontsource-variable/inter | web | OFL-1.1 (fuente) / MIT (paquete) | Inter autoalojada con `next/font/local` (02 §6.2), versionada por el lockfile | `next/font/google`: descarga la fuente en el build (red en Docker); copiar el `.woff2` a mano: sin integridad del lockfile |
 | TanStack Query | web | MIT | Caché y estado de servidor en el cliente | Impuesto por `CLAUDE.md` §1.2 |
 | Zod | web | MIT | Validación de entradas, entorno y contrato | Impuesto por `CLAUDE.md` §1.2 |
 | Prisma | web | Apache-2.0 | ORM y migraciones (ADR-0001): `prisma` (CLI, dev) y `@prisma/client` | Drizzle (ver ADR-0001) |
@@ -144,3 +148,7 @@ versión de uv; las imágenes oficiales se reconstruyen con parches de seguridad
   `@types/pg`). Prisma 8 sigue en *release candidate*.
 - **2026-11-24 (revisión de H1):** se añade `@vitest/coverage-v8` (misma versión que Vitest) para medir la
   cobertura de la web con umbral en `src/domain`.
+- **2026-11-24 (T1.15):** se registran las utilidades que usan los componentes de shadcn/ui (`clsx`,
+  `tailwind-merge`, `class-variance-authority`) y la fuente Inter (`@fontsource-variable/inter`). La licencia
+  OFL-1.1 es específica de fuentes y permite usarla y distribuirla con la aplicación, así que es compatible con
+  el criterio 1. Se instala Testing Library (ya aprobada): `@testing-library/react`, `user-event` y `jest-dom`.

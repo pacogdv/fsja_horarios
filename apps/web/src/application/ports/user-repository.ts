@@ -13,10 +13,12 @@ export interface UserCredentials {
   readonly lockedUntil: Date | null;
 }
 
-/** Lo que necesitan las guardas para autorizar una petición (02 §5.3). */
+/** Lo que necesitan las guardas para autorizar una petición (02 §5.3) y la barra superior (02 §6.3). */
 export interface Principal {
   readonly role: Role;
   readonly isActive: boolean;
+  /** Nombre visible en la interfaz (`app_user.display_name`). */
+  readonly displayName: string;
   /** Docente vinculado (`teacher.user_id`); `null` si el usuario no es docente. */
   readonly teacherId: string | null;
   /** Grupos a los que da clase en el horario vigente (P-04). */

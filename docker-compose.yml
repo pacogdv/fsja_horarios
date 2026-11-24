@@ -1,0 +1,121 @@
+# FSJA Horarios: stack local completo (specs/02-architecture-plan.md §1.4 y §5.7; specs/03-tasks.md T1.6).
+#
+#   cp .env.example .env    # y rellena los secretos (ver comentarios de .env.example)
+#   docker compose up -d --build --wait
+#
+# Redes:
+#   - public: única red con salida al exterior. Solo la usa web para publicar el puerto 3000.
+#   - backend (internal): web ↔ db.
+#   - solver_net (internal): web ↔ solver. El solver no comparte red con db ni publica puertos.
+# Los secretos llegan solo del entorno (.env); si falta alguno, `docker compose` se niega a arrancar.
+
+name: fsja-horarios
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?Define POSTGRES_USER en .env}
+      POSTGRES_DB: ${POSTGRES_DB:?Define POSTGRES_DB en .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - backend
+    healthcheck:
+      # $$ evita la interpolación de Compose: las variables se leen dentro del contenedor.
+      test: ["CMD-SHELL", "pg_isready --username \"$${POSTGRES_USER}\" --dbname \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  solver:
+    build:
+      context: services/solver
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      SOLVER_SERVICE_TOKEN: ${SOLVER_SERVICE_TOKEN:?Define SOLVER_SERVICE_TOKEN en .env}
+      SOLVER_MAX_CONCURRENT_JOBS: ${SOLVER_MAX_CONCURRENT_JOBS:-1}
+    networks:
+      - solver_net
+    # Aislamiento del contenedor [02 §5.7].
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    cpus: 2
+    mem_limit: 2g
+    pids_limit: 256
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    environment:
+      APP_ENV: ${APP_ENV:?Define APP_ENV en .env}
+      APP_ORIGIN: ${APP_ORIGIN:?Define APP_ORIGIN en .env}
+      TRUSTED_PROXY_HOPS: ${TRUSTED_PROXY_HOPS:-0}
+      RATE_LIMIT_KEY_SECRET: ${RATE_LIMIT_KEY_SECRET:?Define RATE_LIMIT_KEY_SECRET en .env}
+      DATABASE_URL: ${DATABASE_URL:?Define DATABASE_URL en .env}
+      SOLVER_URL: ${SOLVER_URL:-http://solver:8000}
+      SOLVER_SERVICE_TOKEN: ${SOLVER_SERVICE_TOKEN:?Define SOLVER_SERVICE_TOKEN en .env}
+      SEED_ON_START: ${SEED_ON_START:-false}
+      SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
+      SEED_TEACHER_EMAIL: ${SEED_TEACHER_EMAIL:-}
+      SEED_TEACHER_PASSWORD: ${SEED_TEACHER_PASSWORD:-}
+      SEED_GUEST_EMAIL: ${SEED_GUEST_EMAIL:-}
+      SEED_GUEST_PASSWORD: ${SEED_GUEST_PASSWORD:-}
+    ports:
+      # Solo en localhost: en local la web va por HTTP. En producción la expone el proxy inverso (H6).
+      - "127.0.0.1:3000:3000"
+    networks:
+      - backend
+      - solver_net
+      - public
+    depends_on:
+      db:
+        condition: service_healthy
+      solver:
+        condition: service_healthy
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+networks:
+  public: {}
+  backend:
+    internal: true
+  solver_net:
+    internal: true
+
+volumes:
+  pgdata: {}

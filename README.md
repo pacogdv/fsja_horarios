@@ -27,10 +27,30 @@ Las reglas permanentes del proyecto están en [`CLAUDE.md`](CLAUDE.md) y las dec
 
 | Comando | Qué hace |
 |---------|----------|
-| `pnpm check` | Lint y tipos de web y solver, más los tests del verificador de ADR |
+| `pnpm check` | Lint y tipos de web y solver, más los tests de [`scripts/tests/`](scripts/tests/) (ADR, raíz del monorepo y Docker Compose) |
 | `pnpm lint` / `pnpm typecheck` | Solo lint o solo tipos |
 | `pnpm test` | Tests unitarios de web y solver |
 | `pnpm test:e2e` | Tests E2E (Playwright) |
 | `pnpm dev` | Arranca la web y el solver (en `127.0.0.1:8000`) en modo desarrollo |
 
 Todos delegan en [`scripts/check.sh`](scripts/check.sh).
+
+**Windows:** los scripts son de bash. pnpm los lanza con `cmd.exe`, que no sabe ejecutarlos, así que hay
+que indicarle la shell de Git Bash (una sola vez, en la configuración de usuario de pnpm):
+
+```sh
+pnpm config set script-shell "C:\\Program Files\\Git\\bin\\bash.exe"
+```
+
+O ejecuta directamente `./scripts/check.sh <tarea>` desde Git Bash.
+
+## Arranque con Docker
+
+```sh
+cp .env.example .env    # rellena los secretos vacíos (ver los comentarios del archivo)
+docker compose up -d --build --wait
+./scripts/compose-smoke.sh   # opcional: comprueba salud y aislamiento de red
+```
+
+La web queda en <http://localhost:3000>, publicada solo en `127.0.0.1`. El solver y la base de datos no
+publican puertos: solo son accesibles desde la red interna de Docker.

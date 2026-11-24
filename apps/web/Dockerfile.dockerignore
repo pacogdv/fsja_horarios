@@ -1,0 +1,24 @@
+# Exclusiones del contexto de build de apps/web/Dockerfile. El contexto es la raíz del monorepo, así que
+# Docker (BuildKit) usa este archivo, específico del Dockerfile, en lugar de un .dockerignore en la raíz.
+# Secretos: nunca entran en la imagen.
+**/.env
+**/.env.*
+# Dependencias y artefactos locales: se generan dentro de la imagen.
+**/node_modules
+**/.next
+**/coverage
+**/*.tsbuildinfo
+**/next-env.d.ts
+# Partes del monorepo que la web no necesita.
+.git
+.github
+services
+docs
+specs
+scripts
+apps/web/test
+apps/web/e2e
+apps/web/**/*.test.ts
+apps/web/**/*.test.tsx
+apps/web/Dockerfile
+apps/web/Dockerfile.dockerignore

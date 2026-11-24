@@ -89,6 +89,18 @@ Criterios de admisión de una dependencia:
 | ruff | solver (dev) | MIT | Lint y formato | flake8 + black + isort: tres herramientas |
 | mypy | solver (dev) | MIT | `--strict` (`CLAUDE.md` §1.3) | pyright: menos habitual en el ecosistema Python |
 
+**Imágenes base Docker (T1.6)**
+
+| Dependencia | Ámbito | Licencia | Uso | Alternativa descartada |
+|-------------|--------|----------|-----|------------------------|
+| `postgres:16-alpine` | `db` | PostgreSQL License | Base de datos (spec 02 §1.4) | Imagen Debian: mayor tamaño y superficie |
+| `python:3.12-slim` | `services/solver` | PSF-2.0 | Runtime del solver (spec 02 §1.3) | Alpine: OR-Tools no publica *wheels* para musl |
+| `ghcr.io/astral-sh/uv:0.13.7` | `services/solver` (solo build) | MIT / Apache-2.0 | Copia el binario de uv para instalar desde `uv.lock` | `pip install uv`: una capa y una descarga más |
+| `node:22-alpine` | `apps/web` | MIT | Build y runtime de Next.js (salida standalone) | `node:22-slim`: mayor tamaño |
+
+Las etiquetas fijan la versión mayor (y la menor de uv). La política de antigüedad mínima se aplica a la
+versión de uv; las imágenes oficiales se reconstruyen con parches de seguridad bajo la misma etiqueta.
+
 ### Hitos posteriores (pendientes de aprobar en su tarea)
 
 | Tarea | Dependencias previstas |
@@ -121,3 +133,5 @@ Criterios de admisión de una dependencia:
   soportado. `@types/node` se alinea con el runtime (Node 22). Se revisará al subir de versión mayor,
   cuando el ecosistema lo admita (`pnpm peers check` sin avisos).
 - **2026-11-22 (T1.5):** se sustituye HTTPX por **httpx2** (sucesor mantenido por la organización de Pydantic, mismo autor y licencia), porque Starlette 1.10 declara obsoleto `httpx` en `TestClient`.
+- **2026-11-24 (T1.6):** se registran las imágenes base Docker. uv se fija en 0.13.7, la última 0.13.x con
+  al menos dos semanas de antigüedad (compatible con `uv_build>=0.13,<0.14`).

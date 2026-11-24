@@ -231,7 +231,7 @@ services/solver/
 |----------|--------|-------|--------------------|-------|
 | `db` | `postgres:16-alpine` | `backend` | Ninguno (en desarrollo, `5432` solo en `127.0.0.1`) | Volumen `pgdata`, healthcheck `pg_isready` |
 | `solver` | build `services/solver` | `solver_net` (internal) | **Ninguno** | `read_only: true`, `tmpfs /tmp`, límites de CPU y memoria, usuario no root |
-| `web` | build `apps/web` | `backend`, `solver_net`, `public` | `3000` | Ejecuta `prisma migrate deploy` al arrancar; seed opcional con `SEED_ON_START=true` (nunca en producción) |
+| `web` | build `apps/web` | `backend`, `solver_net`, `public` | `3000`, solo en `127.0.0.1` (en local va por HTTP; en producción la expone el proxy inverso del H6) | Ejecuta `prisma migrate deploy` al arrancar; seed opcional con `SEED_ON_START=true` (nunca en producción) |
 
 - `solver_net` y `backend` se declaran con `internal: true`: no tienen salida a Internet.
 - El solver **no comparte red con `db`**, así que no puede llegar a la base de datos.

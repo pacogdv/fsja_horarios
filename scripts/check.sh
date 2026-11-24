@@ -11,6 +11,8 @@
 set -uo pipefail
 
 ROOT="${CHECK_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}"
+# Comando de Docker que se busca para los tests de Docker Compose (los tests lo sustituyen).
+DOCKER_COMMAND="${CHECK_DOCKER:-docker}"
 WEB_DIR="apps/web"
 SOLVER_DIR="services/solver"
 SOLVER_DEV_ADDRESS="--host 127.0.0.1 --port 8000"
@@ -77,6 +79,19 @@ task_check() {
   task_typecheck
   run_step "adr: tests del verificador" ./scripts/tests/check-adrs.test.sh
   run_step "raíz: tests del monorepo" ./scripts/tests/workspace.test.sh
+  compose_tests
+}
+
+# Validación estática de docker-compose.yml y los Dockerfiles (T1.6). Solo necesita la CLI de Docker.
+compose_tests() {
+  local step="infra: tests de Docker Compose"
+  if command -v "$DOCKER_COMMAND" > /dev/null 2>&1; then
+    run_step "$step" ./scripts/tests/compose.test.sh
+  elif [ "${CHECK_REQUIRE_ALL:-0}" = "1" ]; then
+    record "FALLO" "$step (falta la CLI de docker)"
+  else
+    record "OMITIDO" "$step (no está instalada la CLI de docker)"
+  fi
 }
 
 task_test() {

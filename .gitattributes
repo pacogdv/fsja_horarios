@@ -1,0 +1,16 @@
+# Finales de línea LF en todos los sistemas, también en Windows con core.autocrlf=true (ver .editorconfig).
+# Los scripts de shell y los archivos que leen los contenedores Linux fallan con CRLF (`\r` al final de
+# cada línea o de cada valor de .env).
+* text=auto eol=lf
+
+# Binarios: sin conversión ni diff de texto.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
+*.xlsx binary

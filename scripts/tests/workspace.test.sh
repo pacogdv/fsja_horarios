@@ -39,8 +39,9 @@ json() { # json <archivo> <expresión JS sobre j>
 
 assert "package.json existe y es JSON válido" json "$ROOT/package.json" 'true'
 assert "package.json es privado (no publicable por error)" json "$ROOT/package.json" 'j.private === true'
+# La expresión no empieza por "/": Git Bash (MSYS) convierte esos argumentos en rutas de Windows.
 assert "packageManager fija una versión exacta de pnpm" \
-  json "$ROOT/package.json" '/^pnpm@\d+\.\d+\.\d+$/.test(j.packageManager)'
+  json "$ROOT/package.json" 'RegExp("^pnpm@\\d+\\.\\d+\\.\\d+$").test(j.packageManager)'
 assert "engines.node exige >= 22" json "$ROOT/package.json" 'j.engines && j.engines.node === ">=22"'
 for task in check test lint typecheck dev test:e2e; do
   assert "script raíz '$task' delega en scripts/check.sh $task" \
@@ -52,6 +53,14 @@ assert ".node-version fija Node 22" grep -Eqx "22(\.[0-9]+){0,2}" "$ROOT/.node-v
 assert ".editorconfig es raíz y usa LF + UTF-8" \
   sh -c "grep -qx 'root = true' '$ROOT/.editorconfig' && grep -qx 'end_of_line = lf' '$ROOT/.editorconfig' && grep -qx 'charset = utf-8' '$ROOT/.editorconfig'"
 assert "README.md enlaza CLAUDE.md y specs" sh -c "grep -q 'CLAUDE.md' '$ROOT/README.md' && grep -q 'specs/' '$ROOT/README.md'"
+# Con core.autocrlf=true (Windows), sin esta regla los .sh y .env.example se descargan con CRLF.
+assert ".gitattributes fuerza finales de línea LF" grep -Eqx '\*[[:space:]]+text=auto[[:space:]]+eol=lf' "$ROOT/.gitattributes"
+crlf_in_index="$(cd "$ROOT" && git ls-files --eol | awk '$1 == "i/crlf" { print $NF }')"
+if [ -z "$crlf_in_index" ]; then
+  report ok "ningún archivo versionado tiene CRLF en el repositorio"
+else
+  report fail "ningún archivo versionado tiene CRLF en el repositorio" "$crlf_in_index"
+fi
 
 secret_with_value="$(grep -E '^[A-Z0-9_]*(PASSWORD|TOKEN|SECRET)[A-Z0-9_]*=.+' "$ROOT/.env.example" || true)"
 if [ -f "$ROOT/.env.example" ] && [ -z "$secret_with_value" ]; then
@@ -83,7 +92,7 @@ assert ".env sí está ignorado por git" sh -c "cd '$ROOT' && git check-ignore -
 # --------------------------------------------------------------------------------------------------
 
 mkdir -p "$WORK/bin"
-for tool in pnpm uv; do
+for tool in pnpm uv docker; do
   cat > "$WORK/bin/$tool" <<'STUB'
 #!/usr/bin/env bash
 # Stub: registra la invocación y falla si coincide con $STUB_FAIL.
@@ -108,7 +117,8 @@ make_root() {
     > "$WORK/root/scripts/tests/check-adrs.test.sh"
   chmod +x "$WORK/root/scripts/tests/check-adrs.test.sh"
   printf '#!/usr/bin/env bash\necho "workspace-test" >> "$STUB_LOG"\n' > "$WORK/root/scripts/tests/workspace.test.sh"
-  chmod +x "$WORK/root/scripts/tests/workspace.test.sh"
+  printf '#!/usr/bin/env bash\necho "compose-test" >> "$STUB_LOG"\n' > "$WORK/root/scripts/tests/compose.test.sh"
+  chmod +x "$WORK/root/scripts/tests/workspace.test.sh" "$WORK/root/scripts/tests/compose.test.sh"
   : > "$WORK/log"
 }
 
@@ -137,6 +147,14 @@ expect "check: delega ruff y mypy en el solver" \
   'logged "uv run --directory services/solver ruff check ." && logged "uv run --directory services/solver ruff format --check ." && logged "uv run --directory services/solver mypy --strict src"'
 expect "check: ejecuta los tests del verificador de ADR" 'logged "adr-test"'
 expect "check: ejecuta los tests de la raíz del monorepo" 'logged "workspace-test"'
+expect "check: con Docker disponible, ejecuta los tests de Docker Compose (T1.6)" 'logged "compose-test"'
+
+make_root yes yes pass; run_check check CHECK_DOCKER=docker-inexistente
+expect "check: sin Docker, los tests de Docker Compose se omiten y el código es 0" \
+  '[ "$CODE" -eq 0 ] && echo "$OUT" | grep -q "OMITIDO.*docker" && ! logged "compose-test"'
+
+make_root yes yes pass; run_check check CHECK_DOCKER=docker-inexistente CHECK_REQUIRE_ALL=1
+expect "check: con CHECK_REQUIRE_ALL=1, la falta de Docker es un fallo" '[ "$CODE" -ne 0 ]'
 
 make_root yes yes pass; run_check check STUB_FAIL="pnpm --filter web run lint"
 expect "check: si falla la web, el código es != 0" '[ "$CODE" -ne 0 ]'

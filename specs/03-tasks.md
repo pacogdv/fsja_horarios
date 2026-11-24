@@ -32,7 +32,7 @@ Los crea T1.2, T1.3 y T1.5. Cada tarea cita el suyo.
 
 | Alias | Comando | Requisitos |
 |-------|---------|------------|
-| Puerta global | `pnpm check` | Lint + tipos de web (`eslint`, `tsc --noEmit`) y del solver (`ruff check`, `ruff format --check`, `mypy --strict`) |
+| Puerta global | `pnpm check` | Lint + tipos de web (`eslint`, `tsc --noEmit`) y del solver (`ruff check`, `ruff format --check`, `mypy --strict`), más los tests de `scripts/tests/` (los de Docker Compose, solo si hay CLI de Docker) |
 | Web unit | `pnpm --filter web exec vitest run --project unit <ruta>` | — |
 | Web integración | `pnpm --filter web exec vitest run --project integration <ruta>` | `docker compose up -d db` (BD `fsja_test`, reiniciada por la configuración global de Vitest) |
 | Web E2E | `pnpm --filter web exec playwright test <spec>` | `docker compose up -d --wait` |
@@ -61,7 +61,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - [x] T1.3 Andamiaje de `apps/web`
 - [x] T1.4 Variables de entorno validadas
 - [x] T1.5 Andamiaje de `services/solver`
-- [ ] T1.6 Dockerfiles y Docker Compose
+- [x] T1.6 Dockerfiles y Docker Compose
 - [ ] T1.7 Prisma: identidad y curso
 - [ ] T1.8 Política de acceso (RBAC)
 - [ ] T1.9 Hash de contraseñas Argon2id
@@ -204,20 +204,26 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 
 #### T1.6 — Dockerfiles y Docker Compose
 - **Archivos:** `apps/web/Dockerfile`, `services/solver/Dockerfile`, `docker-compose.yml`,
-  `.dockerignore` (en los dos servicios), `scripts/compose-smoke.sh`.
+  exclusiones del contexto de build en los dos servicios (`services/solver/.dockerignore` y
+  `apps/web/Dockerfile.dockerignore`, porque la web se construye desde la raíz para tener el lockfile de pnpm),
+  `scripts/compose-smoke.sh`, `scripts/tests/compose.test.sh` (validación estática con `docker compose config`).
 - **Criterios de aceptación:**
   - Imágenes multi-stage con usuario no root.
   - El solver tiene `read_only`, `tmpfs /tmp`, `cap_drop: [ALL]`, `no-new-privileges` y límites de CPU y memoria.
   - Las redes `backend` y `solver_net` son `internal: true`. El solver **no** está en `backend` y no
     publica puertos.
   - `db` tiene healthcheck `pg_isready`. `web` y `solver` tienen healthcheck HTTP.
+  - `web` publica el `3000` solo en `127.0.0.1` (02 §1.4), como `pnpm dev` (T1.3).
+  - Los secretos llegan solo del entorno: si falta uno, `docker compose` no arranca y nombra la variable.
+  - `pnpm check` ejecuta `scripts/tests/compose.test.sh`. Sin CLI de Docker, el paso se marca `OMITIDO`
+    (fallo con `CHECK_REQUIRE_ALL=1`).
   - `compose-smoke.sh` comprueba:
     1. Todos los servicios terminan en estado *healthy*.
     2. `curl localhost:8000` falla desde el host.
     3. Desde el contenedor `solver`, `db:5432` no resuelve.
     4. Desde `web`, `solver:8000/health` responde 200.
 - **Refs:** [02 §1.4, §5.7]
-- **Test:** `docker compose up -d --build --wait && ./scripts/compose-smoke.sh`
+- **Test:** `./scripts/tests/compose.test.sh && docker compose up -d --build --wait && ./scripts/compose-smoke.sh`
 
 #### T1.7 — Prisma: identidad y curso
 - **Archivos:**

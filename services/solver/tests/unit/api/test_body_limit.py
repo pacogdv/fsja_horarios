@@ -63,6 +63,25 @@ def test_las_peticiones_sin_cuerpo_no_se_ven_afectadas(client: TestClient) -> No
     assert client.get("/echo-length").status_code == 405
 
 
+def test_los_mensajes_que_no_son_cuerpo_pasan_sin_contar_para_el_limite() -> None:
+    received: list[Message] = []
+    pending: list[Message] = [{"type": "http.disconnect"}]
+
+    async def app_that_reads_once(scope: Scope, receive: Receive, send: Send) -> None:
+        received.append(await receive())
+
+    async def receive() -> Message:
+        return pending.pop(0)
+
+    async def send(message: Message) -> None:
+        raise AssertionError("no debe responder")
+
+    middleware = BodySizeLimitMiddleware(app_that_reads_once, max_bytes=LIMIT)
+    scope: Scope = {"type": "http", "headers": [], "method": "POST", "path": "/"}
+    asyncio.run(middleware(scope, receive, send))
+    assert received == [{"type": "http.disconnect"}]
+
+
 def test_si_la_respuesta_ya_empezo_no_envia_un_segundo_413_y_propaga_el_error() -> None:
     sent: list[Message] = []
     pending = [{"type": "http.request", "body": b"x" * 600, "more_body": True}] * 2

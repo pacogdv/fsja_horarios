@@ -1,0 +1,17 @@
+# Contexto de build del solver: solo lo que necesita el Dockerfile (pyproject.toml, uv.lock, README.md, src/).
+# Secretos: nunca entran en la imagen.
+.env
+.env.*
+# Entorno y cachés locales.
+.venv
+**/__pycache__
+**/*.pyc
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+# Tests: no forman parte de la imagen de producción.
+tests
+Dockerfile
+.dockerignore

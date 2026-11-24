@@ -107,11 +107,15 @@ describe("T1.3 vitest.config.ts", () => {
     ]);
   });
 
-  it("umbral de cobertura ≥ 90 % en src/domain; con --mode full, también en src/infrastructure", async () => {
+  it("umbral de cobertura ≥ 90 % en src/domain y src/application; con --mode full, también en src/infrastructure", async () => {
     const strict = { lines: 90, branches: 90, functions: 90, statements: 90 };
-    expect((await vitestConfigFor("test")).test?.coverage?.thresholds).toEqual({ "src/domain/**": strict });
+    expect((await vitestConfigFor("test")).test?.coverage?.thresholds).toEqual({
+      "src/domain/**": strict,
+      "src/application/**": strict,
+    });
     expect((await vitestConfigFor("full")).test?.coverage?.thresholds).toEqual({
       "src/domain/**": strict,
+      "src/application/**": strict,
       "src/infrastructure/**": strict,
     });
   });

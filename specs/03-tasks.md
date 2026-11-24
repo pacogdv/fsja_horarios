@@ -34,7 +34,7 @@ Los crea T1.2, T1.3 y T1.5. Cada tarea cita el suyo.
 |-------|---------|------------|
 | Puerta global | `pnpm check` | Lint + tipos de web (`eslint`, `tsc --noEmit`) y del solver (`ruff check`, `ruff format --check`, `mypy --strict`), más los tests de `scripts/tests/` (los de Docker Compose, solo si hay CLI de Docker) |
 | Web unit | `pnpm --filter web exec vitest run --project unit <ruta>` | — |
-| Web cobertura | `pnpm --filter web run test:coverage` (lo ejecuta `pnpm test`) | Umbral ≥ 90 % en `src/domain/**` (líneas, ramas, funciones y sentencias); la infraestructura se cubre con tests de integración |
+| Web cobertura | `pnpm --filter web run test:coverage` (lo ejecuta `pnpm test`) | Umbral ≥ 90 % en `src/domain/**` y `src/application/**` (líneas, ramas, funciones y sentencias); la infraestructura se cubre con tests de integración |
 | Web cobertura completa | `pnpm --filter web run test:coverage:full` | Unit + integración (requiere `docker compose up -d db`); umbral ≥ 90 % también en `src/infrastructure/**`. Lo ejecuta CI (T1.18) |
 | Web integración | `pnpm --filter web exec vitest run --project integration <ruta>` | `docker compose up -d db` (BD `fsja_test`, reiniciada por la configuración global de Vitest) |
 | Web E2E | `pnpm --filter web exec playwright test <spec>` | `docker compose up -d --wait` |
@@ -69,8 +69,8 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - [x] T1.9 Hash de contraseñas Argon2id
 - [x] T1.10 Almacén de sesiones
 - [x] T1.11 Rate limiter en PostgreSQL
-- [ ] T1.12 Casos de uso de login y logout
-- [ ] T1.13 Guardas de servidor y CSRF
+- [x] T1.12 Casos de uso de login y logout
+- [x] T1.13 Guardas de servidor y CSRF
 - [ ] T1.14 Middleware y cabeceras de seguridad
 - [ ] T1.15 Tokens de diseño, layout y login
 - [ ] T1.16 Seed mínimo de usuarios
@@ -304,8 +304,10 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 
 #### T1.12 — Casos de uso de login y logout
 - **Archivos:** `src/application/auth/{login.ts, logout.ts, login.test.ts, logout.test.ts}`,
-  `src/application/ports/{user-repository.ts, audit-log.ts}` (`clock.ts` ya existe desde T1.10),
-  `src/infrastructure/db/repositories/user-repository.ts`.
+  `src/application/ports/{user-repository.ts, audit-log.ts}` (`clock.ts` ya existe desde T1.10; la interfaz
+  `RateLimitKeys` pasa a `ports/rate-limiter.ts`, porque `application` no puede importar `infrastructure`),
+  `src/infrastructure/db/repositories/{user-repository.ts, audit-log-repository.ts}` con sus tests de
+  integración (ninguna otra tarea creaba el adaptador de `audit_log`), `apps/web/test/fakes/auth.ts`.
 - **Criterios de aceptación:**
   - Siguen los pasos 2 a 10 de [02 §5.2], probados con *fakes* de los puertos.
   - Con un usuario inexistente se llama igualmente a `verify` (con hash ficticio), y la respuesta es
@@ -322,9 +324,12 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - **Test:** `pnpm --filter web exec vitest run --project unit src/application/auth`
 
 #### T1.13 — Guardas de servidor y CSRF
-- **Archivos:** `src/infrastructure/auth/guards.ts` (`requireSession`, `withPermission`),
+- **Archivos:** `src/infrastructure/auth/guards.ts` (`makeGuards` → `requireSession`, `withPermission` para
+  Server Actions y `withPermission.route` para Route Handlers, con dependencias inyectadas),
   `src/infrastructure/security/origin-check.ts`, `guards.test.ts`, `origin-check.test.ts`,
-  `apps/web/test/permission-coverage.test.ts`.
+  `apps/web/test/permission-coverage.test.ts`, `UserRepository.findPrincipal` (puerto y adaptador Prisma).
+  La conexión con `cookies()` de `next/headers` se hace en el composition root junto con la primera acción
+  (T1.15).
 - **Criterios de aceptación:**
   - `withPermission` devuelve `401` sin sesión y `403` sin permiso, y si no ejecuta el handler.
   - `requireSession` responde `401` si la cookie falta, el token no corresponde a una sesión vigente
@@ -795,6 +800,8 @@ integración contra PostgreSQL.
   - CRUD con varios departamentos.
   - Las cargas se introducen en horas y minutos y se guardan en minutos.
   - Se puede vincular un usuario `DOCENTE` (único por curso).
+  - `UserRepository.findPrincipal` devuelve el `teacherId` vinculado en el curso vigente (hoy siempre `null`,
+    T1.13), para que los permisos `:own` funcionen.
   - Al borrar se muestran las dependencias.
 - **Refs:** [ENT-01], [01 §4.1]
 - **Test:** `pnpm --filter web exec vitest run --project integration src/application/academic/teachers`
@@ -1078,6 +1085,8 @@ consulta y edita el horario con validación en vivo.
   - Atajos `G`, `P`, `A`, `[` y `]`.
   - Los datos se cargan una vez por versión.
   - `DOCENTE` ve su horario y el de sus grupos, y recibe 403 para otros profesores [VIS-05], [P-04].
+    `UserRepository.findPrincipal` rellena `taughtClassGroupIds` con los grupos del horario vigente (hoy
+    vacío, T1.13).
 - **Refs:** [VIS-02], [VIS-05]
 - **Test:** `pnpm --filter web exec vitest run --project unit src/ui/timetable/perspective-switcher.test.tsx`
 

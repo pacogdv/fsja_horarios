@@ -83,6 +83,37 @@ describe("T1.11 límite por ventana fija [02 §5.6]", () => {
   });
 });
 
+describe("peek: consulta sin contar (límite de login por ip, solo fallos; 02 §5.6)", () => {
+  it("sin contador permite y no crea ninguna fila", async () => {
+    expect(await limiter.peek("solo-fallos", FIVE_PER_MINUTE)).toEqual({ allowed: true, remaining: 4 });
+    expect(await counterOf("solo-fallos")).toBeUndefined();
+  });
+
+  it("no incrementa el contador: muchas consultas no agotan el límite", async () => {
+    await consumeTimes(2, "solo-fallos", FIVE_PER_MINUTE);
+    for (let index = 0; index < 10; index += 1) await limiter.peek("solo-fallos", FIVE_PER_MINUTE);
+    expect(await counterOf("solo-fallos")).toBe(2);
+    expect(await limiter.peek("solo-fallos", FIVE_PER_MINUTE)).toEqual({ allowed: true, remaining: 2 });
+  });
+
+  it("con el límite alcanzado rechaza con retryAfterSeconds, igual que consume", async () => {
+    clock.set(10_000);
+    await consumeTimes(5, "solo-fallos", FIVE_PER_MINUTE);
+    expect(await limiter.peek("solo-fallos", FIVE_PER_MINUTE)).toEqual({ allowed: false, retryAfterSeconds: 50 });
+  });
+
+  it("en la ventana siguiente vuelve a permitir", async () => {
+    await consumeTimes(5, "solo-fallos", FIVE_PER_MINUTE);
+    clock.set(60_000);
+    expect(await limiter.peek("solo-fallos", FIVE_PER_MINUTE)).toEqual({ allowed: true, remaining: 4 });
+  });
+
+  it("valida la clave y la regla como consume", async () => {
+    await expect(limiter.peek("", FIVE_PER_MINUTE)).rejects.toThrow(RangeError);
+    await expect(limiter.peek("k", { limit: 0, windowSeconds: 60 })).rejects.toThrow(RangeError);
+  });
+});
+
 describe("T1.11 atomicidad (INSERT … ON CONFLICT DO UPDATE, ADR-0008)", () => {
   it("20 incrementos concurrentes dejan el contador en exactamente 20", async () => {
     const rule = { limit: 100, windowSeconds: 60 };

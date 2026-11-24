@@ -14,9 +14,17 @@ export type RateLimitDecision =
   /** Al superar el límite se responde 429 con `Retry-After: retryAfterSeconds`. */
   | { readonly allowed: false; readonly retryAfterSeconds: number };
 
+/** Claves de los límites. No contienen datos personales en claro (02 §5.6): el adaptador los seudonimiza. */
+export interface RateLimitKeys {
+  loginByIp(ip: string): string;
+  loginByIpAndEmail(ip: string, email: string): string;
+}
+
 export interface RateLimiter {
   /** Cuenta una petición con esa clave y decide si se permite. */
   consume(key: string, rule: RateLimitRule): Promise<RateLimitDecision>;
+  /** Decide si la siguiente petición se permitiría, sin contarla (límites que solo cuentan fallos). */
+  peek(key: string, rule: RateLimitRule): Promise<RateLimitDecision>;
   /** Borra los contadores de ventanas terminadas hace más de `maxWindowSeconds`; devuelve cuántos. */
   purgeExpired(maxWindowSeconds: number): Promise<number>;
 }

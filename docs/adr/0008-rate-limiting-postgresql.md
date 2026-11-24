@@ -64,3 +64,7 @@ reinicios de la web y ser atómicos ante peticiones concurrentes.
   no contienen datos personales en claro»); el ejemplo anterior la dejaba en claro. Se verifica que Next.js
   solo rellena `X-Forwarded-For` si el cliente no la envía, así que `TRUSTED_PROXY_HOPS = 0` queda
   restringido a local y `env.ts` lo rechaza en production.
+- **2026-11-24 (revisión de T1.12):** el límite de login por ip pasa a contar solo los intentos fallidos
+  (`RateLimiter.peek` antes de verificar y `consume` al fallar). Contando también los correctos, un centro
+  con todo el profesorado tras la misma IP pública (NAT) bloquearía el login al 21.º docente en 15 min. El
+  límite por (ip, correo) sigue contando todos los intentos.

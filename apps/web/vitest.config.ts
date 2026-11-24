@@ -5,8 +5,8 @@ const STRICT = { lines: 90, branches: 90, functions: 90, statements: 90 };
 
 /**
  * Cobertura (solo con --coverage; specs/03-tasks.md §0.3):
- * - `pnpm test:coverage` (lo ejecuta `pnpm test` en la raíz): proyecto unit, umbral en src/domain, que es
- *   TS puro y se cubre con tests unitarios.
+ * - `pnpm test:coverage` (lo ejecuta `pnpm test` en la raíz): proyecto unit, umbral en src/domain y
+ *   src/application (casos de uso como el login), que se cubren con tests unitarios y fakes de los puertos.
  * - `pnpm test:coverage:full` (`--mode full`, requiere la BD; CI): unit + integración, con umbral también en
  *   src/infrastructure, que solo cubren los tests de integración (BD, red).
  */
@@ -22,6 +22,7 @@ export default defineConfig(({ mode }) => ({
       reporter: ["text-summary", "text"],
       thresholds: {
         "src/domain/**": STRICT,
+        "src/application/**": STRICT,
         ...(mode === "full" ? { "src/infrastructure/**": STRICT } : {}),
       },
     },

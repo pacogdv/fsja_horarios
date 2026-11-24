@@ -7,16 +7,12 @@
  * El prefijo de tipo separa los dominios: una IP y un correo con el mismo texto no comparten seudónimo.
  */
 import { createHmac } from "node:crypto";
+import type { RateLimitKeys } from "@/application/ports/rate-limiter";
 
 const SECRET_MIN_LENGTH = 32;
 
 /** Misma normalización que el login (02 §5.2, paso 3): sin espacios alrededor y en minúsculas. */
 const normalizedEmail = (email: string) => email.trim().toLowerCase();
-
-export interface RateLimitKeys {
-  loginByIp(ip: string): string;
-  loginByIpAndEmail(ip: string, email: string): string;
-}
 
 export function createRateLimitKeys(secret: string): RateLimitKeys {
   if (secret.length < SECRET_MIN_LENGTH) {

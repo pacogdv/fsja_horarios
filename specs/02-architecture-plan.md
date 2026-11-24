@@ -926,11 +926,16 @@ cerrado con el nonce. Las fuentes se sirven desde la propia app (`next/font/loca
 
 | Operación | Límite |
 |-----------|--------|
-| Login | 5 / 15 min por (ip, email); 20 / 15 min por ip |
+| Login | 5 / 15 min por (ip, email), todos los intentos; 20 / 15 min por ip, **solo intentos fallidos** |
 | Lanzar motor | 3 / 10 min por usuario, más 1 ejecución activa por curso (índice único parcial, 2.7) |
 | Validar (Fase A) | 30 / 10 min por usuario |
 | Importación | 10 / h por usuario |
 | Exportación PDF en lote | 10 / h por usuario |
+
+El límite de login por ip solo cuenta los fallos porque todo el profesorado de un centro suele salir a Internet
+con la misma IP pública (NAT): contando también los logins correctos, el 21.º docente que entrase entre las
+8:00 y las 8:15 quedaría bloqueado. El límite se consulta sin contar antes de verificar y se incrementa solo
+cuando el login falla; frena igual la fuerza bruta desde una IP.
 
 Al superar el límite se responde `429` con `Retry-After`. Se usa PostgreSQL en lugar de Redis porque hay
 una sola instancia de web. Si se escala horizontalmente, se cambia el adaptador `RateLimiter` sin tocar

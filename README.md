@@ -29,7 +29,7 @@ Las reglas permanentes del proyecto están en [`CLAUDE.md`](CLAUDE.md) y las dec
 |---------|----------|
 | `pnpm check` | Lint y tipos de web y solver, más los tests de [`scripts/tests/`](scripts/tests/) (ADR, raíz del monorepo y Docker Compose) |
 | `pnpm lint` / `pnpm typecheck` | Solo lint o solo tipos |
-| `pnpm test` | Tests unitarios de web (con cobertura: `src/domain` ≥ 90 %) y solver |
+| `pnpm test` | Tests unitarios de web (con cobertura: `src/domain` y `src/application` ≥ 90 %) y solver |
 | `pnpm --filter web run test:integration` | Tests de integración de la web contra PostgreSQL. Requieren `docker compose up -d db` y `TEST_DATABASE_URL` en `.env` (la BD `fsja_test` se borra y recrea en cada ejecución) |
 | `pnpm --filter web run test:coverage:full` | Tests unitarios y de integración de la web con cobertura (≥ 90 % en `src/domain` y `src/infrastructure`). Mismos requisitos que el anterior |
 | `pnpm test:e2e` | Tests E2E (Playwright) |

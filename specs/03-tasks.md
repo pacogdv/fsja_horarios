@@ -483,10 +483,13 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
   - `scripts/ci-env.sh` genera el `.env` de `docker-build` y `e2e` con secretos aleatorios enmascarados.
   - `scripts/tests/ci.test.sh` (dentro de `pnpm check`) comprueba la estructura del workflow y `ci-env.sh`.
     `actionlint` 1.7.7 lo valida sin errores.
-- **Pendiente:**
-  - Que el workflow termine en verde en GitHub: necesita un push.
-  - «Un fallo bloquea el merge»: hay que configurar la protección de `main` en GitHub con los seis checks
-    obligatorios. Es un ajuste del repositorio, no de este código.
+- **Verificado en GitHub (2026-11-24):**
+  - Primera ejecución: falló `e2e`. En Actions, `ci-env.sh` capturaba su orden `::add-mask::` dentro de los
+    secretos, así que el `.env` tenía valores de dos líneas y la migración fallaba.
+  - Se corrigió en `9f288da`, con un test en `ci.test.sh`.
+  - Ejecución 45494016537: los seis trabajos en verde (`e2e`, 146 s).
+- **Pendiente:** «un fallo bloquea el merge» exige configurar la protección de `main` en GitHub con los seis checks
+  obligatorios. Es un ajuste del repositorio, no de este código.
 - **Revisión de seguridad:**
   - `persist-credentials: false` en todos los checkouts: el token de GitHub no queda en `.git/config` para los
     pasos siguientes.

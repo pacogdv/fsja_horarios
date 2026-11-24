@@ -87,3 +87,29 @@ describe("T1.12 PrismaUserRepository", () => {
     expect((await stored()).passwordHash).toBe("$argon2id$nuevo");
   });
 });
+
+describe("T1.17 (adelanto de T3.9) listado y desbloqueo", () => {
+  it("listUsers devuelve los usuarios por correo, sin el hash de la contraseña", async () => {
+    await prisma.appUser.create({
+      data: { email: "bea@centro.example", passwordHash: "$argon2id$otro", displayName: "Bea", role: "DOCENTE", isActive: false },
+    });
+    const list = await repository.listUsers();
+    expect(list.map(({ email, displayName, role, isActive, lockedUntil }) => ({ email, displayName, role, isActive, lockedUntil }))).toEqual([
+      { email: "Ana@Centro.example", displayName: "Ana", role: "ADMIN_DIRECCION", isActive: true, lockedUntil: null },
+      { email: "bea@centro.example", displayName: "Bea", role: "DOCENTE", isActive: false, lockedUntil: null },
+    ]);
+    expect(list[0]?.id).toBe(userId);
+    expect(JSON.stringify(list)).not.toContain("argon2id");
+  });
+
+  it("unlock quita el bloqueo y reinicia los fallos, y devuelve true", async () => {
+    await repository.recordFailedLogin(userId);
+    await prisma.appUser.update({ where: { id: userId }, data: { lockedUntil: new Date("2030-01-01T00:00:00.000Z") } });
+    expect(await repository.unlock(userId)).toBe(true);
+    expect(await stored()).toMatchObject({ lockedUntil: null, failedLoginCount: 0 });
+  });
+
+  it("unlock devuelve false si el usuario no existe", async () => {
+    expect(await repository.unlock("0196b8e4-0000-7000-8000-0000000000ff")).toBe(false);
+  });
+});

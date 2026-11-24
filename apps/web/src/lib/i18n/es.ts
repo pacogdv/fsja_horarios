@@ -61,6 +61,18 @@ export const es = Object.freeze({
     label: "Modo demostración",
     text: "Modo demostración: solo lectura. Puedes consultar todo el centro de ejemplo, pero no modificar datos ni lanzar el motor.",
   }),
+  accessDenied: Object.freeze({
+    title: "Acceso denegado",
+    backHome: "Volver al inicio",
+  }),
+  users: Object.freeze({
+    title: "Usuarios",
+    empty: "No hay usuarios.",
+    unlock: "Desbloquear",
+    unlocked: "Cuenta desbloqueada.",
+    columns: Object.freeze({ name: "Nombre", email: "Correo", role: "Rol", status: "Estado", actions: "Acciones" }),
+    status: Object.freeze({ active: "Activa", locked: "Bloqueada", inactive: "Desactivada" }),
+  }),
   login: Object.freeze({
     title: "Iniciar sesión",
     email: "Correo electrónico",

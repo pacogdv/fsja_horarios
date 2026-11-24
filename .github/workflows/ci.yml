@@ -1,0 +1,162 @@
+# Integración continua (specs/03-tasks.md T1.18; CLAUDE.md §4). Ningún trabajo depende de otro: todos corren en
+# paralelo y cualquier fallo deja el commit o el PR en rojo. Para bloquear el merge, la protección de la rama main
+# debe exigir estos seis checks (ajuste del repositorio en GitHub, no de este archivo).
+#
+# Seguridad: actions fijadas por SHA (ADR-0010), permisos de solo lectura, checkout sin guardar el token
+# (persist-credentials: false) y ningún secreto en el repositorio. El
+# .env de docker-build y e2e lo genera scripts/ci-env.sh con valores aleatorios enmascarados.
+# Lo comprueba scripts/tests/ci.test.sh (parte de pnpm check).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# En PR se cancela la ejecución anterior de la misma rama; en main no, para que cada commit tenga su resultado.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: check (lint, tipos y tests de scripts/tests)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+      - run: pnpm install --frozen-lockfile
+      - run: uv sync --locked --directory services/solver
+      # Con CHECK_REQUIRE_ALL=1, un componente ausente (web, solver, Docker) es un fallo y no un paso omitido.
+      - run: pnpm check
+        env:
+          CHECK_REQUIRE_ALL: "1"
+
+  web-unit:
+    name: web-unit (Vitest con cobertura)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter web
+      # Umbral ≥ 90 % en src/domain y src/application (vitest.config.ts).
+      - run: pnpm --filter web run test:coverage
+
+  web-integration:
+    name: web-integration (PostgreSQL, cobertura completa)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: fsja
+          POSTGRES_PASSWORD: fsja-ci
+          POSTGRES_DB: fsja
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready --username fsja --dbname fsja"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # BD efímera del runner: solo existe durante este trabajo. El nombre debe terminar en _test (T1.7).
+      TEST_DATABASE_URL: postgresql://fsja:fsja-ci@localhost:5432/fsja_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter web
+      # Unit + integración, umbral ≥ 90 % también en src/infrastructure y prisma/seed (--mode full).
+      - run: pnpm --filter web run test:coverage:full
+
+  solver-tests:
+    name: solver-tests (pytest con cobertura)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+      - run: uv run --locked --directory services/solver pytest --cov=solver --cov-report=term-missing
+
+  docker-build:
+    name: docker-build (imágenes de Compose)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: ./scripts/ci-env.sh .env
+      - run: docker compose build
+
+  e2e:
+    name: e2e (stack completo y Playwright)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile --filter web
+      - run: pnpm --filter web exec playwright install --with-deps chromium
+      # .env con SEED_ON_START=true: web migra y crea los usuarios de los E2E al arrancar (T1.16).
+      - run: ./scripts/ci-env.sh .env
+      - run: docker compose up -d --build --wait
+      - run: ./scripts/compose-smoke.sh
+      # Playwright lee las mismas credenciales SEED_* que recibe el contenedor web.
+      - run: |
+          set -a
+          . ./.env
+          set +a
+          pnpm --filter web exec playwright test
+      # El informe incluye trazas de los tests fallidos, con lo que escribieron en los formularios: solo contienen
+      # las credenciales SEED_* aleatorias de esta ejecución, que mueren con el runner.
+      - name: Informe de Playwright
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report
+          retention-days: 14
+      - name: Logs de los contenedores (si algo ha fallado)
+        if: ${{ failure() }}
+        run: docker compose logs --no-color
+      - if: ${{ always() }}
+        run: docker compose down --volumes

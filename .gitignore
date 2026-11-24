@@ -40,6 +40,8 @@ test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
+# Sesiones guardadas por los E2E (cookies de sesión válidas): nunca se versionan.
+apps/web/e2e/.auth/
 
 # =========================================================
 # Python (services/solver)

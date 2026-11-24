@@ -6,7 +6,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Permission } from "@/domain/access/permission";
 import { FakeClock, FakeSessionStore, FakeUserRepository } from "../../../test/fakes/auth";
-import { ACCESS_DENIED_MESSAGES, type AuthenticatedSession, makeGuards, Unauthenticated } from "./guards";
+import {
+  ACCESS_DENIED_MESSAGES,
+  type AuthenticatedSession,
+  deferWithPermission,
+  isAccessDenied,
+  makeGuards,
+  Unauthenticated,
+} from "./guards";
 
 const APP_ORIGIN = "https://horarios.example";
 
@@ -206,5 +213,50 @@ describe("T1.13 withPermission.route (Route Handlers)", () => {
   it("las respuestas de error no se guardan en caché", async () => {
     const response = await guards.withPermission.route("config:read", ok())(request("GET"));
     expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+});
+
+/** Handler que solo se ejecuta si la guarda concede el permiso. */
+const done = () => vi.fn<(session: AuthenticatedSession) => Promise<string>>(async () => "hecho");
+
+describe("T1.17 isAccessDenied: ¿pinta la página datos o «Acceso denegado»? [02 §5.3]", () => {
+  it("reconoce las denegaciones reales de withPermission (401 y 403)", async () => {
+    const unauthenticated = await guards.withPermission("config:read", done())();
+    cookieToken = signIn("u-teacher", "DOCENTE");
+    const forbidden = await guards.withPermission("config:write", done())();
+    expect(isAccessDenied(unauthenticated)).toBe(true);
+    expect(isAccessDenied(forbidden)).toBe(true);
+  });
+
+  it.each([
+    ["el resultado de un handler", "hecho"],
+    ["una lista de datos", [{ id: "u1" }]],
+    ["un resultado de negocio fallido sin estado HTTP", { ok: false, error: "NOT_FOUND", message: "No existe." }],
+    ["un estado que no es 401/403", { ok: false, status: 500, message: "x" }],
+    ["un éxito", { ok: true, status: 403 }],
+    ["null", null],
+    ["undefined", undefined],
+  ])("no confunde %s con una denegación", (_case, value) => {
+    expect(isAccessDenied(value)).toBe(false);
+  });
+});
+
+describe("T1.17 deferWithPermission (withPermission perezoso del composition root)", () => {
+  it("no crea las guardas al envolver: next build importa las acciones sin entorno", () => {
+    const getGuards = vi.fn(() => guards);
+    deferWithPermission(getGuards)("config:read", done());
+    expect(getGuards).not.toHaveBeenCalled();
+  });
+
+  it("al ejecutarse delega en withPermission con el mismo permiso, handler, argumentos y opciones", async () => {
+    cookieToken = signIn("u-teacher", "DOCENTE", { teacherId: "t-1" });
+    const handler = vi.fn(async (_session: AuthenticatedSession, teacherId: string) => `horario de ${teacherId}`);
+    const action = deferWithPermission(() => guards)("timetable:read:own", handler, {
+      resource: (teacherId: string) => ({ kind: "teacher", teacherId }),
+    });
+    expect(await action("t-1")).toBe("horario de t-1");
+    expect(handler).toHaveBeenCalledWith(expect.objectContaining({ userId: "u-teacher" }), "t-1");
+    expect(isAccessDenied(await action("t-2"))).toBe(true);
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 });

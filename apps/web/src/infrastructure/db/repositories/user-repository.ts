@@ -1,7 +1,7 @@
 /**
  * Adaptador Prisma del puerto `UserRepository` (specs/02-architecture-plan.md §2.2 y §5.2).
  */
-import type { Principal, UserCredentials, UserRepository } from "@/application/ports/user-repository";
+import type { Principal, UserCredentials, UserRepository, UserSummary } from "@/application/ports/user-repository";
 import type { DatabaseClient } from "@/infrastructure/db/prisma-client";
 
 const CREDENTIAL_FIELDS = {
@@ -55,5 +55,18 @@ export class PrismaUserRepository implements UserRepository {
 
   async updatePasswordHash(userId: string, passwordHash: string): Promise<void> {
     await this.db.appUser.update({ where: { id: userId }, data: { passwordHash } });
+  }
+
+  listUsers(): Promise<UserSummary[]> {
+    return this.db.appUser.findMany({
+      orderBy: { email: "asc" },
+      select: { id: true, email: true, displayName: true, role: true, isActive: true, lockedUntil: true },
+    });
+  }
+
+  async unlock(userId: string): Promise<boolean> {
+    // updateMany no lanza si no existe: el recuento dice si había usuario.
+    const { count } = await this.db.appUser.updateMany({ where: { id: userId }, data: { lockedUntil: null, failedLoginCount: 0 } });
+    return count === 1;
   }
 }

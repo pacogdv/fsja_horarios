@@ -74,8 +74,8 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - [x] T1.14 Middleware y cabeceras de seguridad
 - [x] T1.15 Tokens de diseño, layout y login
 - [x] T1.16 Seed mínimo de usuarios
-- [ ] T1.17 E2E de autenticación y RBAC
-- [ ] T1.18 Integración continua
+- [x] T1.17 E2E de autenticación y RBAC
+- [x] T1.18 Integración continua
 
 #### T1.1 — ADR de base
 - **Archivos:** `docs/adr/README.md` (índice), `docs/adr/0000-plantilla.md`, `docs/adr/0001-prisma-web-duena-esquema.md`,
@@ -444,6 +444,26 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
   - La página hidrata sin violaciones de CSP en la consola del navegador. T1.14 lo verificó solo a nivel de
     HTML (todos los scripts llevan el nonce de la petición); falta el navegador real, incluido
     `upgrade-insecure-requests` sobre `http://localhost`.
+- **Implementación:**
+  - Para los criterios de `/administracion/usuarios` y de la Server Action de escritura, se adelanta de T3.9
+    el listado de usuarios y el **desbloqueo de cuenta**: `src/application/admin/users.ts`,
+    `UserRepository.listUsers/unlock`, la página con su loader en `withPermission("users:manage")` y la acción
+    `unlockUser`.
+  - Sin permiso, la página muestra «Acceso denegado» (`src/ui/layout/access-denied.tsx`) con estado 200. No se
+    usa `forbidden()`, que en Next.js 16 exige la opción experimental `authInterrupts`.
+  - `withPermission` de `src/lib/container.ts` es perezoso: `next build` importa las acciones sin entorno.
+- **E2E:**
+  - `e2e/auth.setup.ts` inicia sesión una vez por rol (sesiones en `e2e/.auth/`, ignorado por git).
+  - Cada test usa una IP de cliente aleatoria en `X-Forwarded-For`, que solo cuenta con `TRUSTED_PROXY_HOPS=0`
+    (stack de desarrollo). Así los límites por IP y por (IP, correo) no se comparten entre tests, y los tests
+    se pueden repetir sin esperar 15 min.
+  - La demo envía el formulario de desbloqueo con su propia sesión. Recibe la denegación (`"status":403`) y la
+    cuenta sigue bloqueada.
+  - Verificado dos veces seguidas: 18/18, sin violaciones de CSP en Chromium sobre `http://localhost`.
+- **Revisión de seguridad:**
+  - `isAccessDenied` y el `withPermission` perezoso pasan de `container.ts` (sin tests) a `guards.ts`, con tests.
+    `isAccessDenied` exige el estado 401/403: un resultado de negocio fallido no cuenta como denegación.
+  - Test del camino de error de `unlockUser` (sin revalidar la página).
 - **Refs:** [02 §5], [TFM-03]
 - **Test:** `pnpm --filter web exec playwright test e2e/auth.spec.ts e2e/rbac.spec.ts`
 
@@ -457,6 +477,20 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
   - Ejecuta `pnpm check` con `CHECK_REQUIRE_ALL=1`, de modo que un componente ausente hace fallar CI.
   - Un fallo en cualquier trabajo bloquea el merge.
 - **Refs:** [CLAUDE.md §4]
+- **Implementación:**
+  - `.github/workflows/ci.yml` tiene seis trabajos en paralelo y se ejecuta en cada push a `main` y en cada PR.
+  - Las actions están fijadas por SHA (ADR-0010) y los permisos son `contents: read`.
+  - `scripts/ci-env.sh` genera el `.env` de `docker-build` y `e2e` con secretos aleatorios enmascarados.
+  - `scripts/tests/ci.test.sh` (dentro de `pnpm check`) comprueba la estructura del workflow y `ci-env.sh`.
+    `actionlint` 1.7.7 lo valida sin errores.
+- **Pendiente:**
+  - Que el workflow termine en verde en GitHub: necesita un push.
+  - «Un fallo bloquea el merge»: hay que configurar la protección de `main` en GitHub con los seis checks
+    obligatorios. Es un ajuste del repositorio, no de este código.
+- **Revisión de seguridad:**
+  - `persist-credentials: false` en todos los checkouts: el token de GitHub no queda en `.git/config` para los
+    pasos siguientes.
+  - `cancel-in-progress` solo en PR: cada commit de `main` tiene su resultado.
 - **Test:** el workflow termina en verde en un PR de prueba (`gh run watch`).
 
 ---
@@ -865,6 +899,8 @@ integración contra PostgreSQL.
 
 #### T3.9 — Usuarios
 - **Archivos:** `src/application/admin/users.ts` con tests, `src/app/(app)/administracion/usuarios/`.
+- **Ya hecho en T1.17:** listado de usuarios y desbloqueo de cuenta, con `audit_log`, `withPermission("users:manage")` y E2E.
+  Queda el CRUD, el cambio de rol y el restablecimiento de contraseña, con revocación de sesiones.
 - **Criterios de aceptación:**
   - CRUD de usuarios y asignación de rol.
   - Al desactivar un usuario o cambiar su rol se **revocan sus sesiones** al instante.

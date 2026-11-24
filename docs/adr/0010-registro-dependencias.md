@@ -107,6 +107,19 @@ Criterios de admisión de una dependencia:
 | `ghcr.io/astral-sh/uv:0.13.7` | `services/solver` (solo build) | MIT / Apache-2.0 | Copia el binario de uv para instalar desde `uv.lock` | `pip install uv`: una capa y una descarga más |
 | `node:22-alpine` | `apps/web` | MIT | Build y runtime de Next.js (salida standalone) | `node:22-slim`: mayor tamaño |
 
+**GitHub Actions (CI, T1.18)**
+
+Se fijan por SHA de commit (una etiqueta se puede mover), con la versión como comentario. Se usa la versión más
+alta publicada hace al menos dos semanas, igual que con las dependencias.
+
+| Dependencia | Ámbito | Licencia | Uso | Alternativa descartada |
+|-------------|--------|----------|-----|------------------------|
+| actions/checkout | CI | MIT | Descarga el repositorio | — |
+| actions/setup-node | CI | MIT | Node 22 y caché del store de pnpm | Instalar Node a mano: sin caché |
+| pnpm/action-setup | CI | MIT | pnpm en la versión de `packageManager` | Corepack en el runner: no cachea el store por sí solo |
+| astral-sh/setup-uv | CI | MIT / Apache-2.0 | uv y su caché | `pip install uv`: sin caché |
+| actions/upload-artifact | CI | MIT | Informe de Playwright y cobertura como artefactos | — |
+
 Las etiquetas fijan la versión mayor (y la menor de uv). La política de antigüedad mínima se aplica a la
 versión de uv; las imágenes oficiales se reconstruyen con parches de seguridad bajo la misma etiqueta.
 
@@ -159,3 +172,6 @@ versión de uv; las imágenes oficiales se reconstruyen con parches de seguridad
   - Se añade `jiti`, que ya estaba en el lockfile como dependencia transitiva de ESLint y Tailwind, para
     ejecutar el seed en TypeScript. Se verificó que funciona con el cliente generado de Prisma 7 (wasm y
     adaptador `pg`) y con `@node-rs/argon2`.
+- **2026-11-24 (T1.17 y T1.18):**
+  - Se instala Playwright (`@playwright/test`, ya aprobado), solo con el navegador Chromium.
+  - Se registran las GitHub Actions de CI, fijadas por SHA.

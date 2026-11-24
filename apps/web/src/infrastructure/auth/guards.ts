@@ -82,8 +82,6 @@ function jsonError(status: 401 | 403, message: string): Response {
   return Response.json({ error: message }, { status, headers: { "cache-control": "no-store" } });
 }
 
-const isAccessDenied = (value: AuthenticatedSession | AccessDenied): value is AccessDenied => "ok" in value;
-
 export function makeGuards(deps: GuardDependencies) {
   async function requireSession(): Promise<AuthenticatedSession> {
     const token = await deps.readSessionToken();
@@ -148,4 +146,33 @@ export function makeGuards(deps: GuardDependencies) {
   }
 
   return { requireSession, withPermission: Object.assign(withPermission, { route }) };
+}
+
+export type Guards = ReturnType<typeof makeGuards>;
+
+/** Firma de `withPermission` para Server Actions y loaders de página. */
+export type WithPermission = <Args extends unknown[], Result>(
+  permission: Permission,
+  handler: (session: AuthenticatedSession, ...args: Args) => Promise<Result>,
+  options?: PermissionOptions<Args>,
+) => (...args: Args) => Promise<Result | AccessDenied>;
+
+/**
+ * `withPermission` que obtiene las guardas al ejecutarse, no al envolver. Lo usa el composition root: `next build`
+ * importa las Server Actions sin entorno, así que las guardas (y la BD) no pueden crearse al importar el módulo.
+ */
+export function deferWithPermission(getGuards: () => Pick<Guards, "withPermission">): WithPermission {
+  return (permission, handler, options) =>
+    async (...args) =>
+      getGuards().withPermission(permission, handler, options)(...args);
+}
+
+/**
+ * ¿Es `value` una denegación de `withPermission` (401 o 403)? Las páginas lo usan para elegir entre los datos y
+ * «Acceso denegado». Un resultado de negocio fallido (sin estado 401/403) no es una denegación.
+ */
+export function isAccessDenied(value: unknown): value is AccessDenied {
+  if (typeof value !== "object" || value === null) return false;
+  const { ok, status } = value as { ok?: unknown; status?: unknown };
+  return ok === false && (status === 401 || status === 403);
 }

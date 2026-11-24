@@ -118,7 +118,9 @@ make_root() {
   chmod +x "$WORK/root/scripts/tests/check-adrs.test.sh"
   printf '#!/usr/bin/env bash\necho "workspace-test" >> "$STUB_LOG"\n' > "$WORK/root/scripts/tests/workspace.test.sh"
   printf '#!/usr/bin/env bash\necho "compose-test" >> "$STUB_LOG"\n' > "$WORK/root/scripts/tests/compose.test.sh"
-  chmod +x "$WORK/root/scripts/tests/workspace.test.sh" "$WORK/root/scripts/tests/compose.test.sh"
+  printf '#!/usr/bin/env bash\necho "ci-test" >> "$STUB_LOG"\n' > "$WORK/root/scripts/tests/ci.test.sh"
+  chmod +x "$WORK/root/scripts/tests/workspace.test.sh" "$WORK/root/scripts/tests/compose.test.sh" \
+    "$WORK/root/scripts/tests/ci.test.sh"
   : > "$WORK/log"
 }
 
@@ -148,6 +150,7 @@ expect "check: delega ruff y mypy en el solver" \
 expect "check: ejecuta los tests del verificador de ADR" 'logged "adr-test"'
 expect "check: ejecuta los tests de la raíz del monorepo" 'logged "workspace-test"'
 expect "check: con Docker disponible, ejecuta los tests de Docker Compose (T1.6)" 'logged "compose-test"'
+expect "check: ejecuta los tests del workflow de CI (T1.18)" 'logged "ci-test"'
 
 make_root yes yes pass; run_check check CHECK_DOCKER=docker-inexistente
 expect "check: sin Docker, los tests de Docker Compose se omiten y el código es 0" \

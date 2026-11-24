@@ -25,6 +25,16 @@ export interface Principal {
   readonly taughtClassGroupIds: ReadonlySet<string>;
 }
 
+/** Datos de un usuario para su administración (T3.9): nunca el hash de la contraseña. */
+export interface UserSummary {
+  readonly id: string;
+  readonly email: string;
+  readonly displayName: string;
+  readonly role: Role;
+  readonly isActive: boolean;
+  readonly lockedUntil: Date | null;
+}
+
 export interface UserRepository {
   /** Usuario de una sesión, o `null` si ya no existe. */
   findPrincipal(userId: string): Promise<Principal | null>;
@@ -37,4 +47,8 @@ export interface UserRepository {
   /** Reinicia fallos y bloqueo y guarda la fecha del login. */
   recordSuccessfulLogin(userId: string, at: Date): Promise<void>;
   updatePasswordHash(userId: string, passwordHash: string): Promise<void>;
+  /** Todos los usuarios, por correo. */
+  listUsers(): Promise<UserSummary[]>;
+  /** Quita el bloqueo y reinicia los fallos. `false` si el usuario no existe. */
+  unlock(userId: string): Promise<boolean>;
 }

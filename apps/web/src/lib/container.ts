@@ -6,13 +6,23 @@
  * rutas y acciones de `src/app` solo llaman a `getContainer()`.
  */
 import { cookies, headers } from "next/headers";
+import { makeListUsers, makeUnlockUser, type UnlockUserResult, type UserListItem } from "@/application/admin/users";
 import { makeLogin } from "@/application/auth/login";
 import { makeLogout } from "@/application/auth/logout";
 import { systemClock } from "@/application/ports/clock";
 import type { Role } from "@/domain/access/role";
 import { Argon2PasswordHasher } from "@/infrastructure/auth/argon2-hasher";
 import { clearedSessionCookie, SESSION_COOKIE_NAME, type SessionCookie } from "@/infrastructure/auth/cookies";
-import { makeGuards, Unauthenticated } from "@/infrastructure/auth/guards";
+import {
+  type AccessDenied,
+  type AuthenticatedSession,
+  deferWithPermission,
+  type Guards,
+  isAccessDenied,
+  makeGuards,
+  Unauthenticated,
+  type WithPermission,
+} from "@/infrastructure/auth/guards";
 import { type LoginActionOutcome, makeLoginAction } from "@/infrastructure/auth/login-action";
 import { makeLogoutRoute } from "@/infrastructure/auth/logout-route";
 import { PgSessionStore } from "@/infrastructure/auth/pg-session-store";
@@ -31,13 +41,16 @@ export interface CurrentUser {
   readonly displayName: string;
 }
 
-export type { LoginActionOutcome };
+export type { AccessDenied, AuthenticatedSession, LoginActionOutcome };
 
 export interface Container {
   /** Usuario de la sesión vigente, o `null` si no hay sesión válida (cookie ausente, caducada o usuario inactivo). */
   readonly currentUser: () => Promise<CurrentUser | null>;
   readonly loginAction: (formData: FormData) => Promise<LoginActionOutcome>;
   readonly logoutRoute: (request: Request) => Promise<Response>;
+  readonly guards: Guards;
+  readonly listUsers: () => Promise<UserListItem[]>;
+  readonly unlockUser: (actorUserId: string, input: unknown) => Promise<UnlockUserResult>;
 }
 
 async function readSessionToken(): Promise<string | null> {
@@ -69,6 +82,9 @@ export function createContainer(): Container {
   const guards = makeGuards({ readSessionToken, sessions, users, appOrigin: env.APP_ORIGIN });
 
   return Object.freeze({
+    guards,
+    listUsers: makeListUsers({ users, clock }),
+    unlockUser: makeUnlockUser({ users, auditLog }),
     async currentUser() {
       try {
         const { userId, role, displayName } = await guards.requireSession();
@@ -106,3 +122,13 @@ export function getContainer(): Container {
   container ??= createContainer();
   return container;
 }
+
+/**
+ * `withPermission` de las guardas (02 §5.3) para Server Actions y loaders de página de src/app. Es perezoso: el
+ * contenedor (entorno, BD) se crea en la primera llamada, no al importar el módulo, porque `next build` importa
+ * las acciones sin entorno. El nombre debe ser `withPermission`: lo busca test/permission-coverage.test.ts.
+ */
+export const withPermission: WithPermission = deferWithPermission(() => getContainer().guards);
+
+/** ¿Es el resultado de `withPermission` una denegación (401/403)? */
+export { isAccessDenied };

@@ -7,7 +7,7 @@ import type { Clock } from "@/application/ports/clock";
 import type { PasswordHasher } from "@/application/ports/password-hasher";
 import type { RateLimitDecision, RateLimiter, RateLimitKeys, RateLimitRule } from "@/application/ports/rate-limiter";
 import type { NewSessionInput, Session, SessionStore } from "@/application/ports/session-store";
-import type { Principal, UserCredentials, UserRepository } from "@/application/ports/user-repository";
+import type { Principal, UserCredentials, UserRepository, UserSummary } from "@/application/ports/user-repository";
 
 export class FakeClock implements Clock {
   constructor(private current = new Date("2026-11-24T08:00:00.000Z")) {}
@@ -63,6 +63,27 @@ export class FakeUserRepository implements UserRepository {
     };
     this.users.set(stored.id, stored);
     return stored;
+  }
+
+  /** Usuario guardado, para preparar o comprobar su estado en los tests. */
+  byEmail(email: string): StoredUser {
+    const user = [...this.users.values()].find((candidate) => candidate.email === email);
+    if (!user) throw new Error(`usuario ${email} no existe`);
+    return user;
+  }
+
+  async listUsers(): Promise<UserSummary[]> {
+    return [...this.users.values()]
+      .sort((a, b) => a.email.localeCompare(b.email))
+      .map(({ id, email, displayName, role, isActive, lockedUntil }) => ({ id, email, displayName, role, isActive, lockedUntil }));
+  }
+
+  async unlock(userId: string): Promise<boolean> {
+    const user = this.users.get(userId);
+    if (!user) return false;
+    user.lockedUntil = null;
+    user.failedLoginCount = 0;
+    return true;
   }
 
   private byId(userId: string): StoredUser {

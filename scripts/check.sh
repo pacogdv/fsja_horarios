@@ -79,6 +79,7 @@ task_check() {
   task_typecheck
   run_step "adr: tests del verificador" ./scripts/tests/check-adrs.test.sh
   run_step "raíz: tests del monorepo" ./scripts/tests/workspace.test.sh
+  run_step "ci: tests del workflow" ./scripts/tests/ci.test.sh
   compose_tests
 }
 

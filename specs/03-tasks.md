@@ -66,7 +66,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - [x] T1.7 Prisma: identidad y curso
 - [x] T1.8 Política de acceso (RBAC)
 - [x] T1.9 Hash de contraseñas Argon2id
-- [ ] T1.10 Almacén de sesiones
+- [x] T1.10 Almacén de sesiones
 - [ ] T1.11 Rate limiter en PostgreSQL
 - [ ] T1.12 Casos de uso de login y logout
 - [ ] T1.13 Guardas de servidor y CSRF
@@ -267,8 +267,9 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 - **Test:** `pnpm --filter web exec vitest run --project unit src/infrastructure/auth/argon2-hasher.test.ts`
 
 #### T1.10 — Almacén de sesiones
-- **Archivos:** `src/application/ports/session-store.ts`,
-  `src/infrastructure/auth/{pg-session-store.ts, cookies.ts, pg-session-store.int.test.ts}`.
+- **Archivos:** `src/application/ports/{session-store.ts, clock.ts}` (el puerto `Clock` se adelanta desde
+  T1.12: las caducidades se prueban con un reloj falso),
+  `src/infrastructure/auth/{pg-session-store.ts, cookies.ts, pg-session-store.int.test.ts, cookies.test.ts}`.
 - **Criterios de aceptación:**
   - El token tiene 32 bytes aleatorios y en BD **solo** se guarda su SHA-256 (el test busca el token en
     claro en la tabla y no lo encuentra).
@@ -301,7 +302,7 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
 
 #### T1.12 — Casos de uso de login y logout
 - **Archivos:** `src/application/auth/{login.ts, logout.ts, login.test.ts, logout.test.ts}`,
-  `src/application/ports/{user-repository.ts, audit-log.ts, clock.ts}`,
+  `src/application/ports/{user-repository.ts, audit-log.ts}` (`clock.ts` ya existe desde T1.10),
   `src/infrastructure/db/repositories/user-repository.ts`.
 - **Criterios de aceptación:**
   - Siguen los pasos 2 a 10 de [02 §5.2], probados con *fakes* de los puertos.
@@ -311,6 +312,8 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
     código) de una cuenta bloqueada es idéntica a la de una contraseña incorrecta. El bloqueo se registra
     en `audit_log`.
   - Un hash obsoleto se rehashea tras un login correcto.
+  - Tras un login correcto se revoca la sesión previa del navegador, si la había (fijación de sesión), y se
+    llama a `SessionStore.purgeExpired` (purga oportunista de T1.10, ADR-0002).
   - Los logins correctos y fallidos se registran en `audit_log`, nunca con la contraseña.
 - **Refs:** [02 §5.2], [CLAUDE.md §3.1]
 - **Test:** `pnpm --filter web exec vitest run --project unit src/application/auth`
@@ -321,6 +324,8 @@ acceso queda controlado por rol en el servidor. CI ejecuta todo.
   `apps/web/test/permission-coverage.test.ts`.
 - **Criterios de aceptación:**
   - `withPermission` devuelve `401` sin sesión y `403` sin permiso, y si no ejecuta el handler.
+  - `requireSession` responde `401` si la cookie falta, el token no corresponde a una sesión vigente
+    (`SessionStore.findValid`) o el usuario está inactivo (`is_active = false`), como en 02 §5.3.
   - `origin-check` rechaza las mutaciones con `Origin` ausente o distinto de `APP_ORIGIN`.
   - `permission-coverage.test.ts` analiza todos los `actions.ts` y `route.ts` y falla si alguna
     exportación no está envuelta en `withPermission`. Hay una lista blanca explícita solo para login.
@@ -795,7 +800,8 @@ integración contra PostgreSQL.
 - **Criterios de aceptación:**
   - CRUD de usuarios y asignación de rol.
   - Al desactivar un usuario o cambiar su rol se **revocan sus sesiones** al instante.
-  - Al restablecer la contraseña se genera una temporal que se muestra una sola vez.
+  - Al restablecer la contraseña se genera una temporal que se muestra una sola vez, y se revocan todas las
+    sesiones del usuario (`revokeAllForUser`): una sesión robada no sobrevive al cambio.
   - **Desbloquear cuenta**: pone `locked_until = null` y `failed_login_count = 0`, y queda registrado en
     `audit_log`. Es la mitigación del riesgo de bloqueo dirigido (02 §5.2, ADR-0002).
   - Solo accede `users:manage`.
